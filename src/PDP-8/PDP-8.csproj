@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>PDP_8</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>AnyCPU;x64</Platforms>
+    <ApplicationIcon>pdp8.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CSharpCommon\FileUtils.cs" Link="FileUtils.cs" />
+    <Compile Include="..\CSharpCommon\General.cs" Link="General.cs" />
+    <Compile Include="..\CSharpCommon\Parameters.cs" Link="Parameters.cs" />
+    <Compile Include="..\CSharpCommon\PreserveState.cs" Link="PreserveState.cs" />
+    <Compile Include="..\CSharpCommon\StringUtils.cs" Link="StringUtils.cs" />
+    <Compile Include="..\CSharpCommon\XmlTree.cs" Link="XmlTree.cs" />
+    <Compile Include="..\CSharpCommon\XmlWriter.cs" Link="XmlWriter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="pdp8.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
