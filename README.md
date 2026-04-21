@@ -30,7 +30,7 @@ The Weather Radar environment is described in [this long historical post](https:
 
 
 
-Open `PDP8.sln` in Visual Studio 2022 and build the `PDP8Simulator` project.
+Open `PDP-8.sln` in Visual Studio 2022 and build the `PDP-8` project.
 
 
 
@@ -39,6 +39,8 @@ Open `PDP8.sln` in Visual Studio 2022 and build the `PDP8Simulator` project.
 
 
 The simulator runs as a standalone WinForms application. No external dependencies.
+
+
 
 
 
