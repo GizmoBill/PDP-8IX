@@ -142,10 +142,6 @@ namespace PDP_8
 
     private void oS8ToolStripMenuItem_Click(object sender, EventArgs e)
     {
-      //rk05.LoadDisk(0, "C:\\Users\\bsilv\\Documents\\PiDP8-I\\RK05 Images\\v3dNew.rk05");
-      //rk05.LoadDisk(1, "C:\\Users\\bsilv\\Documents\\PiDP8-I\\RK05 Images\\diskNew.rk05");
-      //rk05.LoadDisk(2, "C:\\Users\\bsilv\\Documents\\PiDP8-I\\RK05 Images\\RetroOCRNew.rk05");
-
       Cpu.LoadAddress(0x200);
       Cpu.Deposit(FromOctal("6743"));
       Cpu.Deposit(FromOctal("6741"));
