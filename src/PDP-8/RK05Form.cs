@@ -104,8 +104,10 @@ namespace PDP_8
         ofd.InitialDirectory = Path.GetDirectoryName(getFilename(getDriveNum(sender)));
       if (ofd.ShowDialog() == DialogResult.OK)
       {
-        RK05.LoadDisk(getDriveNum(sender), ofd.FileName);
+        int drive = getDriveNum(sender);
+        RK05.LoadDisk(drive, ofd.FileName);
         setFilename(getDriveNum(sender), ofd.FileName);
+        filenameTextBoxes[drive].BackColor = Color.White;
       }
     }
 
@@ -123,8 +125,10 @@ namespace PDP_8
       sfd.Filter = "RK05 File|*.rk05";
       if (sfd.ShowDialog() == DialogResult.OK)
       {
-        RK05.SaveDisk(getDriveNum(sender), sfd.FileName);
+        int drive = getDriveNum(sender);
+        RK05.SaveDisk(drive, sfd.FileName);
         setFilename(getDriveNum(sender), sfd.FileName);
+        filenameTextBoxes[drive].BackColor = Color.White;
       }
     }
   }

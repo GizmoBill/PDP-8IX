@@ -1,6 +1,6 @@
 ﻿namespace PDP_8
 {
-  partial class Listing
+  partial class Tek611Form
   {
     /// <summary>
     /// Required designer variable.
@@ -28,41 +28,41 @@
     /// </summary>
     private void InitializeComponent()
     {
-      listingText = new TextBox();
+      nonStoreCheck = new CheckBox();
       SuspendLayout();
       // 
-      // listingText
+      // nonStoreCheck
       // 
-      listingText.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-      listingText.HideSelection = false;
-      listingText.Location = new Point(0, 0);
-      listingText.Multiline = true;
-      listingText.Name = "listingText";
-      listingText.ReadOnly = true;
-      listingText.ScrollBars = ScrollBars.Vertical;
-      listingText.Size = new Size(1038, 572);
-      listingText.TabIndex = 0;
-      listingText.Click += listingText_Click;
+      nonStoreCheck.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+      nonStoreCheck.AutoSize = true;
+      nonStoreCheck.BackColor = Color.Black;
+      nonStoreCheck.ForeColor = Color.White;
+      nonStoreCheck.Location = new Point(706, 736);
+      nonStoreCheck.Name = "nonStoreCheck";
+      nonStoreCheck.Size = new Size(165, 29);
+      nonStoreCheck.TabIndex = 0;
+      nonStoreCheck.Text = "NonStore Mode";
+      nonStoreCheck.UseVisualStyleBackColor = false;
+      nonStoreCheck.CheckedChanged += nonStoreCheck_CheckedChanged;
       // 
-      // Listing
+      // Tek611Form
       // 
       AutoScaleDimensions = new SizeF(144F, 144F);
       AutoScaleMode = AutoScaleMode.Dpi;
-      ClientSize = new Size(1040, 576);
-      Controls.Add(listingText);
-      Font = new Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
-      Margin = new Padding(4);
-      Name = "Listing";
+      BackgroundImageLayout = ImageLayout.Zoom;
+      ClientSize = new Size(871, 766);
+      Controls.Add(nonStoreCheck);
+      DoubleBuffered = true;
+      Name = "Tek611Form";
       StartPosition = FormStartPosition.Manual;
-      Text = "Listing";
-      FormClosing += Listing_FormClosing;
-      Enter += Listing_Enter;
+      Text = "Tektronix 611 Storage Scope";
+      FormClosing += Tek611Form_FormClosing;
       ResumeLayout(false);
       PerformLayout();
     }
 
     #endregion
 
-    private TextBox listingText;
+    private CheckBox nonStoreCheck;
   }
 }

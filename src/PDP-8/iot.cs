@@ -15,6 +15,7 @@ using Accessibility;
 using CSharpCommon;
 using Microsoft.VisualBasic.Devices;
 using PDP_8;
+using System.Diagnostics;
 using System.Security.Policy;
 using System.Text;
 using static PDP8;
@@ -113,8 +114,15 @@ public class ClockQueue
 
   public void CallMe(string id, double fromNow)
   {
-    double wakeTime = Time + fromNow;
     int i;
+    for (i = 0; i < queue.Count; ++i)
+      if (queue[i].Item2 == id)
+      {
+        queue.RemoveAt(i);
+        break;
+      }
+
+    double wakeTime = Time + fromNow;
     for (i = 0; i < queue.Count && queue[i].Item1 > wakeTime; ++i) ;
     queue.Insert(i, (wakeTime, id));
   }
@@ -138,6 +146,11 @@ public class ClockQueue
       for (int i = 1; i < ph.Count; ++i)
         queue.Add((double.Parse(ph[i]), ph.Name(i)));
     }
+  }
+
+  public void Reset()
+  {
+    queue.Clear();
   }
 }
 
@@ -341,6 +354,7 @@ public class PriorityInterrupt : IODevice
 
   public PriorityInterrupt()
   {
+    RegisterDevice(FromOctal("56"), this);
   }
 
   public override XmlLiteNode State
@@ -1158,61 +1172,250 @@ public class SupervisorCall : IODevice
   }
 }
 
-// ********************************
-// *                              *
-// *  Hurricane Research Project  *
-// *                              *
-// ********************************
-//
-// Hardware from Air Force, modified and augmented as needed.
+// *******************
+// *                 *
+// *  DEC AF01A A/D  *
+// *                 *
+// *******************
 
-public class HRP : IODevice
+public class AF01A : IODevice
 {
-  private HRPForm hrp;
+  HRPForm hrp;
 
-  private IOFlag integratorFlag = new IOFlag(GetChannel(FromOctal("33")));
+  int channel = 0;
 
-  CSharpCommon.GaussRandom grand = new GaussRandom(); // for simulated integrator
-
-  public HRP(HRPForm hrpForm)
+  public AF01A(HRPForm hrp)
   {
-    hrp = hrpForm;
-
-    RegisterDevice(FromOctal("11"), this);    // INA
-    RegisterDevice(FromOctal("12"), this);    // DNS
-    RegisterDevice(FromOctal("31"), this);    // FRE
-    RegisterDevice(FromOctal("32"), this);    // SRA
-    RegisterDevice(FromOctal("33"), this);    // RVI
-    RegisterDevice(FromOctal("35"), this);    // INB
-    RegisterDevice(FromOctal("41"), this);    // TL2
-    RegisterDevice(FromOctal("45"), this);    // OSW
-
-    RegisterDevice(FromOctal("51"), this);    // WR66 control, WR not HRP
-
-    RegisterAction("integrator", integratorDone);
-
-    grand.Mean = 128;
-    grand.Sigma = 32;
-
+    RegisterDevice(FromOctal("53"), this);
+    RegisterDevice(FromOctal("54"), this);
+    this.hrp = hrp;
   }
 
   public override XmlLiteNode State
   {
     get
     {
-      string s = string.Format("integratorFlag = {0};\n", integratorFlag.Flag);
-      return new XmlLiteNode("hrpDevice", s);
+      string s = string.Format("channel = {0};\n", channel);
+      return new XmlLiteNode(XmlTag, s);
     }
 
     set
     {
-      CheckTag(value, "hrpDevice");
+      CheckTag(value, XmlTag);
+
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
         switch (ph.Name(i))
         {
-          case "integratorFlag":
-            integratorFlag.Flag = bool.Parse(ph[i]);
+          case "channel":
+            channel = int.Parse(ph[i]);
+            break;
+
+          default:
+            throw new Exception("Unknown A/D parameter " + ph.Name(i));
+        }
+
+    }
+  }
+
+  public override string XmlTag => "aToD";
+
+  public override void Iot(int controlBits, ref int bus, out bool skip)
+  {
+    skip = false;
+
+    switch ((Cpu.MBR >> 3) & 0x3F)
+    {
+      case 43:
+        // Skip on flag, always ready
+        if ((controlBits & 1) != 0)
+          skip = true;
+
+        // Start conversion
+        if ((controlBits & 2) != 0)
+          ;
+
+        // Read
+        if ((controlBits & 4) != 0)
+          bus |= hrp.Dial(channel);
+
+        break;
+
+      case 44:
+        // Clear channel
+        if ((controlBits & 1) != 0)
+          channel = 0;
+
+        // Set channel
+        if ((controlBits & 2) != 0)
+          channel = bus & 0x3F;
+
+        // Increment channel
+        if ((controlBits & 4) != 0)
+          channel = (channel + 1) & 0x3F;
+
+        break;
+
+      default:
+        throw new Exception(string.Format("Internal A/D error {0}", ToOctal(Cpu.MBR)));
+    }
+  }
+
+  public override void Reset()
+  {
+  }
+}
+
+// ********************************
+// *                              *
+// *  Hurricane Research Project  *
+// *                              *
+// ********************************
+//
+// Hardware from Air Force, modified and augmented as needed by MIT.
+
+public class HRP : IODevice
+{
+  private HRPForm hrp;
+
+  int wr66Low_;
+  int wr66High_;
+  int wr73AzV_;
+  int wr73El_;
+  int osw_;
+  int sevenSeg_;
+
+  int wr66Low
+  {
+    get => wr66Low_;
+    set
+    {
+      wr66Low_ = value;
+
+      hrp.wr66AzVelLabel.Text = ((wr66Low & 0x0FF) - 128).ToString();
+    }
+  }
+
+  int wr66High
+  {
+    get => wr66High_;
+    set
+    {
+      wr66High_ = value;
+
+      hrp.wr66ElVelLabel.Text = (((wr66High >> 4) & 0x0F0) | (wr66Low >> 8)).ToString();
+    }
+  }
+
+  int wr73AzV
+  {
+    get => wr73AzV_;
+    set
+    {
+      wr73AzV_ = value;
+
+      hrp.wr73AzVelLabel.Text = (512 - wr73AzV).ToString();
+    }
+  }
+
+  int wr73El
+  {
+    get => wr73El_;
+    set
+    {
+      wr73El_ = value;
+
+      hrp.wr73ElSetLabel.Text = (wr73El * 360.0 / 4096.0 - 115.0).ToString();
+    }
+  }
+
+  int osw
+  {
+    get => osw_;
+    set
+    {
+      osw_ = value;
+
+      hrp.oswRadarSelLabel.Text = (osw & 0x10) != 0 ? "WR73" : "WR66";
+    }
+  }
+
+  int sevenSeg
+  {
+    get => sevenSeg_;
+    set
+    {
+      sevenSeg_ = value;
+
+      hrp.sevenSegLabel.Text = sevenSeg.ToString();
+    }
+  }
+
+  int eswSelect = 0;
+
+  public HRP(HRPForm hrpForm)
+  {
+    hrp = hrpForm;
+
+    RegisterDevice(FromOctal("11"), this);    // INA, read WR66 az, el
+    RegisterDevice(FromOctal("12"), this);    // DNS, read WR73 az, el
+    RegisterDevice(FromOctal("16"), this);    // TI-980 interface, MIT
+    RegisterDevice(FromOctal("31"), this);    // FRE, WR66 S/D (ignored)
+    RegisterDevice(FromOctal("35"), this);    // INB, WR73 az, el (ignored)
+    RegisterDevice(FromOctal("36"), this);    // ESR, external switch register
+    RegisterDevice(FromOctal("41"), this);    // TL2, one-digit dial and pushbutton
+    RegisterDevice(FromOctal("42"), this);    // WR73 set elevation, MIT
+    RegisterDevice(FromOctal("44"), this);    // WR73 azimuth velocity, MIT
+    RegisterDevice(FromOctal("45"), this);    // OSW, output switch word
+    RegisterDevice(FromOctal("51"), this);    // WR66 control, MIT
+
+    Reset();
+  }
+
+  public override XmlLiteNode State
+  {
+    get
+    {
+      string s = string.Format("wr66Low = {0};\nwr66High = {1};\n", wr66Low, wr66High);
+      s += string.Format("wr73AzV = {0};\nwr73El = {1};\n", wr73AzV, wr73El);
+      s += string.Format("osw = {0};\nseg7 = {1};\n", osw, sevenSeg);
+      s += string.Format("eswSel = {0};\n", eswSelect);
+      return new XmlLiteNode(XmlTag, s);
+    }
+
+    set
+    {
+      CheckTag(value, XmlTag);
+      ParamHolder ph = new ParamHolder(value.Value);
+      for (int i = 0; i < ph.Count; ++i)
+        switch (ph.Name(i))
+        {
+          case "wr66Low":
+            wr66Low = int.Parse(ph[i]);
+            break;
+
+          case "wr66High":
+            wr66High = int.Parse(ph[i]);
+            break;
+
+          case "wr73AzV":
+            wr73AzV = int.Parse(ph[i]);
+            break;
+
+          case "wr73El":
+            wr73El = int.Parse(ph[i]);
+            break;
+
+          case "osw":
+            osw = int.Parse(ph[i]);
+            break;
+
+          case "seg7":
+            sevenSeg = int.Parse(ph[i]);
+            break;
+
+          case "eswSel":
+            eswSelect = int.Parse(ph[i]);
             break;
 
           default:
@@ -1221,7 +1424,7 @@ public class HRP : IODevice
     }
   }
 
-  public override string XmlTag => string.Empty;
+  public override string XmlTag => "hrpDevices";
 
   // WR66 AZ and EL come from 14-bit synchro-to-digital converters producing binary angles.
   // the HRPForm properties Az66 and El66 return 14-bit binary angles.
@@ -1288,6 +1491,25 @@ public class HRP : IODevice
         }
         break;
 
+      case "16":
+        switch (controlBits)
+        {
+          case 1:
+            // TIR, red from TI-980, unused
+            break;
+
+          case 2:
+            // TIW, write to TI, skip if successful. Always skip to avoid hanging
+            // in a wait loop at 23673. Wait loop at 15662 times out
+            skip = true;
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
       case "31":
         // FRE
         switch (controlBits)
@@ -1302,55 +1524,43 @@ public class HRP : IODevice
         }
         break;
 
-      case "32":
-        // SRA instructions. 2 and 6 each used once in ITGST to load
-        // integrator params, including a yet unknown start bit
-        switch (controlBits)
-        {
-          case 2:
-            // ICW1
-            hrp.IntegratorControlWord1 = bus;
-            break;
-
-          case 6:
-            // ICW2
-            hrp.IntegratorControlWord2 = bus;
-            CallMeReal("integrator", 64000.0);  // 16 pulses at 250 PRF
-            break;
-
-          default:
-            Cpu.IllegalInstr();
-            break;
-        }
-        break;
-
-      case "33":
-        // RVI instructions. 2 and 4 each used once to read the integrator.
-        // There's probably an unused skip on flag
-        switch (controlBits)
-        {
-          case 2:
-            // Clear flag
-            integratorFlag.Flag = false;
-            break;
-
-          case 4:
-            // Read next bin
-            bus = (int)grand.NextDouble();
-            break;
-
-          default:
-            Cpu.IllegalInstr();
-            break;
-        }
-        break;
-
       case "35":
         // INB unneeded WR73 az el instructions
         switch (controlBits)
         {
           case 1:
             // latch (bus = 1) release (bus = 1) WR73 S/D
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
+      case "36":
+        // External switch register
+        switch (controlBits)
+        {
+          case 2:
+            switch (eswSelect)
+            {
+              case 0x800:
+                bus = hrp.ESR1;
+                break;
+
+              case 0x008:
+                bus = hrp.ESR2;
+                break;
+
+              default:
+                Cpu.IllegalInstr();
+                break;
+            }
+            break;
+
+          case 5:
+            eswSelect = bus;
             break;
 
           default:
@@ -1374,18 +1584,47 @@ public class HRP : IODevice
 
         break;
 
+      case "42":
+        switch (controlBits)
+        {
+          case 2:
+            // PEL73, position WR73 elevation
+            wr73El = bus;
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
+      case "44":
+        // INI
+        switch (controlBits)
+        {
+          case 1:
+            // set WR73 AZ velocity
+            wr73AzV = bus;
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
       case "45":
         // OSW (radar select, 2-digit 7-segment display)
         switch (controlBits)
         {
           case 1:
-            hrp.OSW = bus;
+            osw = bus;
             break;
 
           case 2:
             int highDigit = (bus & 0x0F0) >> 4;
             int lowDigit = bus & 0x00F;
-            hrp.SevenSeg = highDigit * 10 + lowDigit;
+            sevenSeg = highDigit * 10 + lowDigit;
             break;
 
           default:
@@ -1412,12 +1651,14 @@ public class HRP : IODevice
           // source comment: /SEND WR66 SERVO INFO FROM EVH4, EL4AV
           case 6:
             // write low
-            hrp.WR66ServoLow = bus;
+            wr66Low = bus;
+            bus = 0;
             break;
 
           case 7:
             // write high
-            hrp.WR66ServoHigh = bus;
+            wr66High = bus;
+            bus = 0;
             break;
 
           default:
@@ -1431,6 +1672,210 @@ public class HRP : IODevice
     }
   }
 
+  public override void Reset()
+  {
+    wr66Low = 0;
+    wr66High = 0;
+    wr73AzV = 0;
+    wr73El = 0;
+    osw = 0;
+    sevenSeg = 0;
+  }
+}
+
+// ****************
+// *              *
+// *  Integrator  *
+// *              *
+// ****************
+
+public class Integrator : IODevice
+{
+  private HRPForm hrp;
+
+  int icw1_;
+  int icw2_;
+
+  int icw1
+  {
+    get => icw1_;
+    set
+    {
+      icw1_ = value;
+
+      hrp.intSkipLabel.Text = binskip.ToString();
+      hrp.intResLabel.Text = binres.ToString("f1");
+    }
+  }
+
+  int icw2
+  {
+    get => icw2_;
+    set
+    {
+      icw2_ = value;
+
+      hrp.intRadarSelLabel.Text = wr73Selected ? "WR73" : "WR66";
+      hrp.intTNPLabel.Text = ((icw2 >> 7) & 7).ToString();
+      hrp.intPulsesLabel.Text = (icw2 & 0x7F).ToString();
+    }
+  }
+
+  private IOFlag integratorFlag = new IOFlag(GetChannel(FromOctal("33")));
+
+  GaussRandom grand = new GaussRandom();
+
+  int binskip { get { return icw1 >> 3; } }
+
+  double binres { get { return (icw1 & 7) / 2.0; } }
+
+  bool wr73Selected { get { return (icw2 & 0x400) == 0; } }
+
+  // Synthetic radar data. A elliptical Gaussian centered at (x0, y0), at angle ang0,
+  // with stDev (xSigma, ySigma). The IOT instructions set range and angle, with
+  // range updated as bins are read. 
+  double range;
+  double angle;
+
+  // Elliptical Gaussian parameters
+  double x0 = -40.0;
+  double y0 = 10;
+  double ang0 = MathUtil.Radians(15.0);
+  double xSigma = 6.0;
+  double ySigma = 60.0;
+
+  // Retrieve the synthetic bin at the current range and angle.
+  int bin
+  {
+    get
+    {
+      // Elliptical Gauss, 0 <= z <= 1
+      double x = range * Math.Cos(angle + ang0);
+      double y = range * Math.Sin(angle + ang0);
+      double z = MathUtil.square((x - x0) / xSigma) + MathUtil.square((y - y0) / ySigma);
+      z = Math.Exp(-0.5 * z);
+
+      // Add some noise, correct for power loss at range (emperical, not realistic),
+      // convert to integer bin value
+      z += grand.NextDouble();
+      z -= 0.2 * Math.Log10(Math.Max(range, 1));
+      z = Math.Max(z, 0);
+      return (int)(z * 768.0) + 192;
+    }
+  }
+
+  public Integrator(HRPForm hrpForm)
+  {
+    hrp = hrpForm;
+
+    RegisterDevice(FromOctal("32"), this);    // SRA, load integrator control words
+    RegisterDevice(FromOctal("33"), this);    // RVI, read integrator bins
+
+    RegisterAction("integrator", integratorDone);
+
+    grand.Mean = 0;
+    grand.Sigma = 0.02;
+
+    Reset();
+
+    //test();
+  }
+
+  public override XmlLiteNode State
+  {
+    get
+    {
+      string s = string.Format("integratorFlag = {0};\n", integratorFlag.Flag);
+      s += string.Format("icw1 = {0};\nicw2 = {1};\n", icw1, icw2);
+      return new XmlLiteNode(XmlTag, s);
+    }
+
+    set
+    {
+      CheckTag(value, XmlTag);
+      ParamHolder ph = new ParamHolder(value.Value);
+      for (int i = 0; i < ph.Count; ++i)
+        switch (ph.Name(i))
+        {
+          case "integratorFlag":
+            integratorFlag.Flag = bool.Parse(ph[i]);
+            break;
+
+          case "icw1":
+            icw1 = int.Parse(ph[i]);
+            break;
+
+          case "icw2":
+            icw2 = int.Parse(ph[i]);
+            break;
+
+          default:
+            throw new Exception("Unknown integrator parameter " + ph.Name(i));
+        }
+    }
+  }
+
+  public override string XmlTag => "integrator";
+
+  public override void Iot(int controlBits, ref int bus, out bool skip)
+  {
+    skip = false;
+
+    switch (ToOctal((Cpu.MBR >> 3) & 0x3F, 2))
+    {
+      case "32":
+        // SRA instructions. 2 and 6 each used once in ITGST to load
+        // integrator params, including a yet unknown start bit
+        switch (controlBits)
+        {
+          case 2:
+            // ICW1
+            icw1 = bus;
+            break;
+
+          case 6:
+            // ICW2
+            icw2 = bus;
+            range = binskip * binres;
+            decimal az = wr73Selected ? hrp.wr73AzNumeric.Value : hrp.wr66AzNumeric.Value;
+            angle = MathUtil.Radians(MathUtil.mod((double)(90 - az), 360));
+
+            CallMeReal("integrator", (icw2 & 0x07F) * 4000.0);  // pulses at 250 PRF
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
+      case "33":
+        // RVI instructions. 2 and 4 each used once to read the integrator.
+        // There's probably an unused skip on flag
+        switch (controlBits)
+        {
+          case 2:
+            // Clear flag
+            integratorFlag.Flag = false;
+            break;
+
+          case 4:
+            // Read next bin
+            bus = bin;
+            range += binres;
+            break;
+
+          default:
+            Cpu.IllegalInstr();
+            break;
+        }
+        break;
+
+      default:
+        throw new Exception(string.Format("Internal integrator error {0}", ToOctal(Cpu.MBR)));
+    }
+  }
+
   void integratorDone()
   {
     integratorFlag.Flag = true;
@@ -1439,5 +1884,129 @@ public class HRP : IODevice
   public override void Reset()
   {
     integratorFlag.Flag = false;
+
+    icw1 = FromOctal("0121");
+    icw2 = FromOctal("6240");
+  }
+
+  void test()
+  {
+    Bitmap img = new Bitmap(250, 250);
+
+    for (int y = 0; y < img.Height; ++y)
+      for (int x = 0; x < img.Width; ++x)
+      {
+        range = MathUtil.EuclidDist(x - 0.5 * img.Width, y - 0.5 * img.Height);
+        angle = Math.Atan2(y - 0.5 * img.Height, x - 0.5 * img.Width);
+        int z = bin >> 2;
+        img.SetPixel(x, y, Color.FromArgb(z, z, z));
+      }
+
+    img.Save("testRadarImg.bmp");
+  }
+}
+
+// *********************************
+// *                               *
+// *  Tektronix 611 Storage Scope  *
+// *                               *
+// *********************************
+
+// x and y scope coordinates are 10-bit values
+public class Tek611 : IODevice
+{
+  Tek611Form tek611;
+
+  int xCoord, yCoord;
+
+  public Tek611(Tek611Form tek611)
+  {
+    RegisterDevice(5, this);
+    RegisterDevice(6, this);
+    this.tek611 = tek611;
+  }
+
+  public override XmlLiteNode State
+  {
+    get
+    {
+      string s = string.Format("x = {0};\ny = {1};\n", xCoord, yCoord);
+      return new XmlLiteNode(XmlTag, s);
+    }
+
+    set
+    {
+      CheckTag(value, XmlTag);
+      ParamHolder ph = new ParamHolder(value.Value);
+      for (int i = 0; i < ph.Count; ++i)
+        switch (ph.Name(i))
+        {
+          case "x":
+            xCoord = int.Parse(ph[i]);
+            break;
+
+          case "y":
+            yCoord = int.Parse(ph[i]);
+            break;
+
+          default:
+            throw new Exception("Unknown 611 scope parameter " + ph.Name(i));
+            break;
+        }
+    }
+  }
+
+  public override string XmlTag => "tek611";
+
+  public override void Iot(int controlBits, ref int bus, out bool skip)
+  {
+    skip = false;
+
+    switch ((Cpu.MBR >> 3) & 0x3F)
+    {
+      case 5:
+        if ((controlBits & 1) != 0)
+          eraseScope();
+
+        if ((controlBits & 2) != 0)
+          xCoord = bus & 0x3FF;
+
+        if ((controlBits & 4) != 0)
+          plotPoint();
+
+        break;
+
+      case 6:
+        if ((controlBits & 1) != 0)
+          // skip if scope still erasing, which it never is
+          ;
+
+        if ((controlBits & 2) != 0)
+          yCoord = bus & 0x3FF;
+
+        if ((controlBits & 4) != 0)
+          plotPoint();
+
+        break;
+
+      default:
+        throw new Exception(string.Format("Internal Tek611 error {0}", ToOctal(Cpu.MBR)));
+    }
+  }
+
+  public override void Reset()
+  {
+    xCoord = yCoord = 0;
+    eraseScope();
+  }
+
+  void eraseScope()
+  {
+    tek611.Erase();
+  }
+
+  void plotPoint()
+  {
+    tek611.Plot(xCoord, yCoord);
   }
 }

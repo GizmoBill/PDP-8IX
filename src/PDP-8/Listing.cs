@@ -38,6 +38,12 @@ namespace PDP_8
 
     public void ShowAddress(int address)
     {
+      if (!Visible)
+      {
+        lastAddress = -1;
+        return;
+      }
+
       if (address == lastAddress)
         return;
 
@@ -64,6 +70,16 @@ namespace PDP_8
         e.Cancel = true;
         Hide();
       }
+    }
+
+    private void Listing_Enter(object sender, EventArgs e)
+    {
+      lastAddress = -1;
+    }
+
+    private void listingText_Click(object sender, EventArgs e)
+    {
+      lastAddress = -1;
     }
   }
 }

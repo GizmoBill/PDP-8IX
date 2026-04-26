@@ -7,6 +7,7 @@ using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.Design;
@@ -17,12 +18,19 @@ namespace PDP_8
   public partial class HRPForm : Form
   {
     HRP hrp;
+    AF01A a2d;
+    Integrator integ;
 
     public HRPForm()
     {
       InitializeComponent();
 
       hrp = new HRP(this);
+      a2d = new AF01A(this);
+      integ = new Integrator(this);
+
+      spyCombo.SelectedIndex = 0;
+      esrCombo.SelectedIndex = 0;
     }
 
     private void HRPForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -34,23 +42,6 @@ namespace PDP_8
       }
     }
 
-    // *********
-    // *       *
-    // *  OSW  *
-    // *       *
-    // *********
-
-    public int OSW
-    {
-      get { return FromOctal(oswLabel.Text); }
-      set { oswLabel.Text = ToOctal(value); }
-    }
-
-    public int SevenSeg
-    {
-      get { return int.Parse(sevenSegLabel.Text); }
-      set { sevenSegLabel.Text = value.ToString("d2"); }
-    }
 
     // *********
     // *       *
@@ -77,8 +68,8 @@ namespace PDP_8
 
     public int TLS
     {
-      get { return (int)tls2Numeric.Value; }
-      set { tls2Numeric.Value = value; }
+      get { return spyCombo.SelectedIndex; }
+      set { spyCombo.SelectedIndex = value; }
     }
 
     // ***********
@@ -86,7 +77,6 @@ namespace PDP_8
     // *  AZ/EL  *
     // *         *
     // ***********
-
 
     bool azUpdate_ = false;
 
@@ -105,8 +95,14 @@ namespace PDP_8
     }
 
     // Like the original hardware, WR66 angles are 14-bit binary and WR73 are BCD tenths degree
-    public int Az66 { get { return (int)((float)wr66AzNumeric.Value / 360.0f * (1 << 14)); } }
-    public int El66 { get { return (int)((float)wr66ElNumeric.Value / 360.0f * (1 << 14)); } }
+    public int Az66
+    {
+      get { return (int)Math.Round((double)wr66AzNumeric.Value / 360.0 * (1 << 14)); }
+    }
+    public int El66
+    {
+      get { return (int)Math.Round((double)wr66ElNumeric.Value / 360.0 * (1 << 14)); }
+    }
 
     int toBCD(decimal angle)
     {
@@ -121,100 +117,78 @@ namespace PDP_8
 
     public int El73 { get { return toBCD(wr73ElNumeric.Value); } }
 
-    // ****************
-    // *              *
-    // *  WR66 Servo  *
-    // *              *
-    // ****************
 
-    public int WR66ServoLow
+    // ******************************
+    // *                            *
+    // *  External Switch Register  *
+    // *                            *
+    // ******************************
+
+    bool zeroClicked = false;
+    bool radarSel = false;
+    bool nextClicked = false;
+
+    private void zeroButton_Click(object sender, EventArgs e)
     {
-      get { return FromOctal(wr66ServoLowLabel.Text); }
-      set { wr66ServoLowLabel.Text = ToOctal(value); }
+      zeroClicked = true;
     }
 
-    public int WR66ServoHigh
+    private void radarSelButton_Click(object sender, EventArgs e)
     {
-      get { return FromOctal(wr66ServoHighLabel.Text); }
-      set { wr66ServoHighLabel.Text = ToOctal(value); }
+      radarSel = !radarSel;
     }
 
-    // ****************
-    // *              *
-    // *  Integrator  *
-    // *              *
-    // ****************
-
-    public int IntegratorControlWord1
+    private void nextButton_Click(object sender, EventArgs e)
     {
-      get { return FromOctal(icw1Label.Text); }
-      set { icw1Label.Text = ToOctal(value); }
+      nextClicked = true;
     }
 
-    public int IntegratorControlWord2
-    {
-      get { return FromOctal(icw2Label.Text); }
-      set { icw2Label.Text = ToOctal(value); }
-    }
-
-    // ***********
-    // *         *
-    // *  State  *
-    // *         *
-    // ***********
-
-    public XmlLiteNode State
+    public int ESR1
     {
       get
       {
-        string s = string.Format("osw1 = {0};\nosw2 = {1};\n", oswLabel.Text, sevenSegLabel.Text);
-        s += string.Format("tls2 = {0};\n", TLS);
-        s += string.Format("wr66az = {0};\n", wr66AzNumeric.Value);
-        s += string.Format("wr66el = {0};\n", wr66ElNumeric.Value);
-        s += string.Format("wr73az = {0};\n", wr73AzNumeric.Value);
-        s += string.Format("wr73el = {0};\n", wr73ElNumeric.Value);
-        return new XmlLiteNode("hrp", s);
-      }
+        int esr1 = 0;
+        if (zeroClicked)
+          esr1 |= 0x100;
+        if (nextClicked)
+          esr1 |= 0x040;
+        if (radarSel)
+          esr1 |= 0x010;
+        if (runCheck.Checked)
+          esr1 |= 0x004;
 
-      set
-      {
-        CheckTag(value, "hrp");
-        ParamHolder ph = new ParamHolder(value.Value);
-        for (int i = 0; i < ph.Count; ++i)
-          switch (ph.Name(i))
-          {
-            case "osw1":
-              oswLabel.Text = ph[i];
-              break;
+        zeroClicked = false;
+        nextClicked = false;
 
-            case "osw2":
-              sevenSegLabel.Text = ph[i];
-              break;
-
-            case "tls2":
-              TLS = int.Parse(ph[i]);
-              break;
-
-            case "wr66az":
-              wr66AzNumeric.Value = decimal.Parse(ph[i]);
-              break;
-
-            case "wr66el":
-              wr66ElNumeric.Value = decimal.Parse(ph[i]);
-              break;
-
-            case "wr73az":
-              wr73AzNumeric.Value = decimal.Parse(ph[i]);
-              break;
-
-            case "wr73el":
-              wr73ElNumeric.Value = decimal.Parse(ph[i]);
-              break;
-
-            default:
-              throw new Exception("Unknown osw parameter " + ph.Name(i));
-          }
+        return esr1;
       }
     }
+
+    public int ESR2
+    {
+      get { return esrCombo.SelectedIndex << 8; }
+    }
+
+    // ******************
+    // *                *
+    // *  Dial for A/D  *
+    // *                *
+    // ******************
+
+    public int Dial(int channel)
+    {
+      switch (channel)
+      {
+        case 1:
+          return aToD1Track.Value ^ 0x800;
+
+        case 2:
+          return aToD2Track.Value ^ 0x800;
+
+        default:
+          return 0;
+      }
+    }
+
   }
 }

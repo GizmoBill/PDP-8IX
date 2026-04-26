@@ -43,7 +43,7 @@ namespace PDP_8
                                             field, addr, ToOctal(core[field, addr])));
 
         int sw = PDP8.Console.FullSwitches;
-        int breakPointOp = sw >> 15;
+        int breakPointOp = (sw >> 15) & 5;
         if ((breakPointOp & 1) != 0 && (cycleType(addr) & 1) != 0)
         {
           if (breakPointOp == 1 && ((field << 12) | addr) == (sw & 0x7FFF))
@@ -62,7 +62,7 @@ namespace PDP_8
                                             field, addr, ToOctal(value)));
 
         int sw = PDP8.Console.FullSwitches;
-        int breakPointOp = sw >> 15;
+        int breakPointOp = (sw >> 15) & 6;
         if ((breakPointOp & 2) != 0 && (cycleType(addr) & 2) != 0)
         {
           if (breakPointOp == 2 && ((field << 12) | addr) == (sw & 0x7FFF))
@@ -128,7 +128,7 @@ namespace PDP_8
     private void breakpoint()
     {
       if (Cpu.EventRecorder.Enable)
-        Cpu.EventRecorder.Record();
+        Cpu.EventRecorder.Record(true);
       else
       {
         Cpu.Run = false;
@@ -207,6 +207,8 @@ namespace PDP_8
 
     public bool Enable { get; set; }
 
+    public bool OnlyBreaks { get; set; }
+
     public int Count { get; private set; }
 
     public int Index
@@ -226,9 +228,9 @@ namespace PDP_8
       writeIndex = 0;
     }
 
-    public void Record()
+    public void Record(bool breakPoint = false)
     {
-      if (Enable)
+      if (Enable & (!OnlyBreaks | breakPoint))
       {
         XmlLiteNode ev = events[writeIndex];
         ev.Children.Clear();
@@ -570,6 +572,7 @@ namespace PDP_8
     // *  Console Actions  *
     // *                   *
     // *********************
+
     public void LoadAddress(int address)
     {
       pc = address & 0xFFF;

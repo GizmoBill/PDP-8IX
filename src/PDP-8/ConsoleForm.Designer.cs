@@ -40,10 +40,10 @@
       oS8ToolStripMenuItem = new ToolStripMenuItem();
       toolStripSeparator1 = new ToolStripSeparator();
       loadListingToolStripMenuItem = new ToolStripMenuItem();
+      readListingToolStripMenuItem = new ToolStripMenuItem();
       splitListingToolStripMenuItem = new ToolStripMenuItem();
       writeBinaryToolStripMenuItem = new ToolStripMenuItem();
       writeSourceToolStripMenuItem = new ToolStripMenuItem();
-      convertToPAL8ToolStripMenuItem = new ToolStripMenuItem();
       toolStripSeparator2 = new ToolStripSeparator();
       coreDumpToolStripMenuItem = new ToolStripMenuItem();
       devicesToolStripMenuItem = new ToolStripMenuItem();
@@ -51,6 +51,7 @@
       tTY2ToolStripMenuItem = new ToolStripMenuItem();
       rK05ToolStripMenuItem = new ToolStripMenuItem();
       hRPToolStripMenuItem = new ToolStripMenuItem();
+      tektronix611ToolStripMenuItem = new ToolStripMenuItem();
       optionsToolStripMenuItem = new ToolStripMenuItem();
       x10ToolStripMenuItem = new ToolStripMenuItem();
       showFrontPanelToolStripMenuItem = new ToolStripMenuItem();
@@ -58,6 +59,7 @@
       showListingToolStripMenuItem1 = new ToolStripMenuItem();
       toolStripSeparator4 = new ToolStripSeparator();
       recordToolStripMenuItem = new ToolStripMenuItem();
+      recordOnlyBreaksToolStripMenuItem = new ToolStripMenuItem();
       firstEventToolStripMenuItem = new ToolStripMenuItem();
       nextEventToolStripMenuItem = new ToolStripMenuItem();
       previousEventToolStripMenuItem = new ToolStripMenuItem();
@@ -120,7 +122,7 @@
       // 
       // fileToolStripMenuItem
       // 
-      fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newToolStripMenuItem, openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, toolStripSeparator3, oS8ToolStripMenuItem, toolStripSeparator1, loadListingToolStripMenuItem, splitListingToolStripMenuItem, writeBinaryToolStripMenuItem, writeSourceToolStripMenuItem, convertToPAL8ToolStripMenuItem, toolStripSeparator2, coreDumpToolStripMenuItem });
+      fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newToolStripMenuItem, openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, toolStripSeparator3, oS8ToolStripMenuItem, toolStripSeparator1, loadListingToolStripMenuItem, readListingToolStripMenuItem, splitListingToolStripMenuItem, writeBinaryToolStripMenuItem, writeSourceToolStripMenuItem, toolStripSeparator2, coreDumpToolStripMenuItem });
       fileToolStripMenuItem.Name = "fileToolStripMenuItem";
       fileToolStripMenuItem.Size = new Size(54, 29);
       fileToolStripMenuItem.Text = "File";
@@ -128,96 +130,98 @@
       // newToolStripMenuItem
       // 
       newToolStripMenuItem.Name = "newToolStripMenuItem";
-      newToolStripMenuItem.Size = new Size(254, 34);
+      newToolStripMenuItem.Size = new Size(270, 34);
       newToolStripMenuItem.Text = "New";
+      newToolStripMenuItem.Click += newToolStripMenuItem_Click;
       // 
       // openToolStripMenuItem
       // 
       openToolStripMenuItem.Name = "openToolStripMenuItem";
-      openToolStripMenuItem.Size = new Size(254, 34);
+      openToolStripMenuItem.Size = new Size(270, 34);
       openToolStripMenuItem.Text = "Open...";
       openToolStripMenuItem.Click += openToolStripMenuItem_Click;
       // 
       // saveToolStripMenuItem
       // 
       saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-      saveToolStripMenuItem.Size = new Size(254, 34);
+      saveToolStripMenuItem.Size = new Size(270, 34);
       saveToolStripMenuItem.Text = "Save";
+      saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
       // 
       // saveAsToolStripMenuItem
       // 
       saveAsToolStripMenuItem.Name = "saveAsToolStripMenuItem";
-      saveAsToolStripMenuItem.Size = new Size(254, 34);
+      saveAsToolStripMenuItem.Size = new Size(270, 34);
       saveAsToolStripMenuItem.Text = "SaveAs...";
       saveAsToolStripMenuItem.Click += saveAsToolStripMenuItem_Click;
       // 
       // toolStripSeparator3
       // 
       toolStripSeparator3.Name = "toolStripSeparator3";
-      toolStripSeparator3.Size = new Size(251, 6);
+      toolStripSeparator3.Size = new Size(267, 6);
       // 
       // oS8ToolStripMenuItem
       // 
       oS8ToolStripMenuItem.Name = "oS8ToolStripMenuItem";
-      oS8ToolStripMenuItem.Size = new Size(254, 34);
+      oS8ToolStripMenuItem.Size = new Size(270, 34);
       oS8ToolStripMenuItem.Text = "OS-8";
       oS8ToolStripMenuItem.Click += oS8ToolStripMenuItem_Click;
       // 
       // toolStripSeparator1
       // 
       toolStripSeparator1.Name = "toolStripSeparator1";
-      toolStripSeparator1.Size = new Size(251, 6);
+      toolStripSeparator1.Size = new Size(267, 6);
       // 
       // loadListingToolStripMenuItem
       // 
       loadListingToolStripMenuItem.Name = "loadListingToolStripMenuItem";
-      loadListingToolStripMenuItem.Size = new Size(254, 34);
+      loadListingToolStripMenuItem.Size = new Size(270, 34);
       loadListingToolStripMenuItem.Text = "Load Listing...";
       loadListingToolStripMenuItem.Click += loadListingToolStripMenuItem_Click;
+      // 
+      // readListingToolStripMenuItem
+      // 
+      readListingToolStripMenuItem.Name = "readListingToolStripMenuItem";
+      readListingToolStripMenuItem.Size = new Size(270, 34);
+      readListingToolStripMenuItem.Text = "Read Listing...";
+      readListingToolStripMenuItem.Click += readListingToolStripMenuItem_Click;
       // 
       // splitListingToolStripMenuItem
       // 
       splitListingToolStripMenuItem.Name = "splitListingToolStripMenuItem";
-      splitListingToolStripMenuItem.Size = new Size(254, 34);
+      splitListingToolStripMenuItem.Size = new Size(270, 34);
       splitListingToolStripMenuItem.Text = "Split Listing...";
       splitListingToolStripMenuItem.Click += splitListingToolStripMenuItem_Click;
       // 
       // writeBinaryToolStripMenuItem
       // 
       writeBinaryToolStripMenuItem.Name = "writeBinaryToolStripMenuItem";
-      writeBinaryToolStripMenuItem.Size = new Size(254, 34);
+      writeBinaryToolStripMenuItem.Size = new Size(270, 34);
       writeBinaryToolStripMenuItem.Text = "Write Binary";
       writeBinaryToolStripMenuItem.Click += writeBinaryToolStripMenuItem_Click;
       // 
       // writeSourceToolStripMenuItem
       // 
       writeSourceToolStripMenuItem.Name = "writeSourceToolStripMenuItem";
-      writeSourceToolStripMenuItem.Size = new Size(254, 34);
+      writeSourceToolStripMenuItem.Size = new Size(270, 34);
       writeSourceToolStripMenuItem.Text = "Write Source";
       writeSourceToolStripMenuItem.Click += writeSourceToolStripMenuItem_Click;
-      // 
-      // convertToPAL8ToolStripMenuItem
-      // 
-      convertToPAL8ToolStripMenuItem.Name = "convertToPAL8ToolStripMenuItem";
-      convertToPAL8ToolStripMenuItem.Size = new Size(254, 34);
-      convertToPAL8ToolStripMenuItem.Text = "Convert to PAL8...";
-      convertToPAL8ToolStripMenuItem.Click += convertToPAL8ToolStripMenuItem_Click;
       // 
       // toolStripSeparator2
       // 
       toolStripSeparator2.Name = "toolStripSeparator2";
-      toolStripSeparator2.Size = new Size(251, 6);
+      toolStripSeparator2.Size = new Size(267, 6);
       // 
       // coreDumpToolStripMenuItem
       // 
       coreDumpToolStripMenuItem.Name = "coreDumpToolStripMenuItem";
-      coreDumpToolStripMenuItem.Size = new Size(254, 34);
+      coreDumpToolStripMenuItem.Size = new Size(270, 34);
       coreDumpToolStripMenuItem.Text = "Core Dump";
       coreDumpToolStripMenuItem.Click += coreDumpToolStripMenuItem_Click;
       // 
       // devicesToolStripMenuItem
       // 
-      devicesToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { tty1ConsoleToolStripMenuItem, tTY2ToolStripMenuItem, rK05ToolStripMenuItem, hRPToolStripMenuItem });
+      devicesToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { tty1ConsoleToolStripMenuItem, tTY2ToolStripMenuItem, rK05ToolStripMenuItem, hRPToolStripMenuItem, tektronix611ToolStripMenuItem });
       devicesToolStripMenuItem.Name = "devicesToolStripMenuItem";
       devicesToolStripMenuItem.Size = new Size(88, 29);
       devicesToolStripMenuItem.Text = "Devices";
@@ -225,30 +229,37 @@
       // tty1ConsoleToolStripMenuItem
       // 
       tty1ConsoleToolStripMenuItem.Name = "tty1ConsoleToolStripMenuItem";
-      tty1ConsoleToolStripMenuItem.Size = new Size(155, 34);
+      tty1ConsoleToolStripMenuItem.Size = new Size(219, 34);
       tty1ConsoleToolStripMenuItem.Text = "TTY1";
       tty1ConsoleToolStripMenuItem.Click += aSR38ConsoleToolStripMenuItem_Click;
       // 
       // tTY2ToolStripMenuItem
       // 
       tTY2ToolStripMenuItem.Name = "tTY2ToolStripMenuItem";
-      tTY2ToolStripMenuItem.Size = new Size(155, 34);
+      tTY2ToolStripMenuItem.Size = new Size(219, 34);
       tTY2ToolStripMenuItem.Text = "TTY2";
       tTY2ToolStripMenuItem.Click += tTY2ToolStripMenuItem_Click;
       // 
       // rK05ToolStripMenuItem
       // 
       rK05ToolStripMenuItem.Name = "rK05ToolStripMenuItem";
-      rK05ToolStripMenuItem.Size = new Size(155, 34);
+      rK05ToolStripMenuItem.Size = new Size(219, 34);
       rK05ToolStripMenuItem.Text = "RK05";
       rK05ToolStripMenuItem.Click += rK05ToolStripMenuItem_Click;
       // 
       // hRPToolStripMenuItem
       // 
       hRPToolStripMenuItem.Name = "hRPToolStripMenuItem";
-      hRPToolStripMenuItem.Size = new Size(155, 34);
+      hRPToolStripMenuItem.Size = new Size(219, 34);
       hRPToolStripMenuItem.Text = "HRP";
       hRPToolStripMenuItem.Click += hRPToolStripMenuItem_Click;
+      // 
+      // tektronix611ToolStripMenuItem
+      // 
+      tektronix611ToolStripMenuItem.Name = "tektronix611ToolStripMenuItem";
+      tektronix611ToolStripMenuItem.Size = new Size(219, 34);
+      tektronix611ToolStripMenuItem.Text = "Tektronix 611";
+      tektronix611ToolStripMenuItem.Click += tektronix611ToolStripMenuItem_Click;
       // 
       // optionsToolStripMenuItem
       // 
@@ -274,7 +285,7 @@
       // 
       // analyzeToolStripMenuItem
       // 
-      analyzeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { showListingToolStripMenuItem1, toolStripSeparator4, recordToolStripMenuItem, firstEventToolStripMenuItem, nextEventToolStripMenuItem, previousEventToolStripMenuItem, clearEventsToolStripMenuItem });
+      analyzeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { showListingToolStripMenuItem1, toolStripSeparator4, recordToolStripMenuItem, recordOnlyBreaksToolStripMenuItem, firstEventToolStripMenuItem, nextEventToolStripMenuItem, previousEventToolStripMenuItem, clearEventsToolStripMenuItem });
       analyzeToolStripMenuItem.Name = "analyzeToolStripMenuItem";
       analyzeToolStripMenuItem.Size = new Size(89, 29);
       analyzeToolStripMenuItem.Text = "Analyze";
@@ -298,6 +309,14 @@
       recordToolStripMenuItem.Size = new Size(290, 34);
       recordToolStripMenuItem.Text = "Record";
       recordToolStripMenuItem.Click += recordToolStripMenuItem_Click;
+      // 
+      // recordOnlyBreaksToolStripMenuItem
+      // 
+      recordOnlyBreaksToolStripMenuItem.CheckOnClick = true;
+      recordOnlyBreaksToolStripMenuItem.Name = "recordOnlyBreaksToolStripMenuItem";
+      recordOnlyBreaksToolStripMenuItem.Size = new Size(290, 34);
+      recordOnlyBreaksToolStripMenuItem.Text = "Record Only Breaks";
+      recordOnlyBreaksToolStripMenuItem.Click += recordOnlyBreaksToolStripMenuItem_Click;
       // 
       // firstEventToolStripMenuItem
       // 
@@ -865,7 +884,6 @@
     private System.Windows.Forms.Timer runTimer;
     private Label burstCycleTimeLabel;
     private ToolStripMenuItem loadListingToolStripMenuItem;
-    private ToolStripMenuItem convertToPAL8ToolStripMenuItem;
     private Label busyTimeLabel;
     private Label cpuCycleTimeLabel;
     private ToolStripMenuItem x10ToolStripMenuItem;
@@ -917,5 +935,8 @@
     private Label maskLabel;
     private Label ionLabel;
     private ToolStripMenuItem hRPToolStripMenuItem;
+    private ToolStripMenuItem tektronix611ToolStripMenuItem;
+    private ToolStripMenuItem recordOnlyBreaksToolStripMenuItem;
+    private ToolStripMenuItem readListingToolStripMenuItem;
   }
 }

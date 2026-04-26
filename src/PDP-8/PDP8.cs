@@ -18,13 +18,19 @@ public static class PDP8
 
   public static Core Core { get; private set; }
 
-  public static ConsoleForm Console {  get; private set; }
-
   public static IODevice[] Devices { get; private set; }
 
   public static BreakPort[] BreakPorts { get; private set; }
 
   public static PriorityInterrupt PriorityInterrupt { get; private set; }
+
+  private static RealTimeClock rtClock;
+
+  private static IntervalTimer intervaTimer;
+
+  private static SupervisorCall svc;
+
+  public static ConsoleForm Console { get; private set; }
 
   // ******************
   // *                *
@@ -71,7 +77,11 @@ public static class PDP8
     Devices[FromOctal("60")] = nulldev; // index register
     Devices[FromOctal("07")] = nulldev;
 
-    Devices[FromOctal("56")] = PriorityInterrupt = new PriorityInterrupt();
+    // Build hardware
+    PriorityInterrupt = new PriorityInterrupt();
+    rtClock = new RealTimeClock();
+    intervaTimer = new IntervalTimer();
+    svc = new SupervisorCall();
 
     Cpu = new CPU();
   }
@@ -108,6 +118,8 @@ public static class PDP8
   // *                *
   // ******************
 
+  private static List<IODevice> uniqueDevices = new List<IODevice>();
+
   public static void SetConsole(ConsoleForm console)
   {
     Console = console;
@@ -118,6 +130,9 @@ public static class PDP8
     if (Devices[addr] != null)
       throw new ArgumentException("I/O device conflict");
     Devices[addr] = device;
+
+    if (!uniqueDevices.Contains(device))
+      uniqueDevices.Add(device);
   }
 
   public static void UnregisterDevice(int addr)
@@ -155,6 +170,14 @@ public static class PDP8
   // *                         *
   // ***************************
 
+  public static void MasterReset()
+  {
+    Cpu.Clear();
+    cycleTimeQueue.Reset();
+    realTimeQueue.Reset();
+    Console.Reset();
+  }
+
   public static XmlLiteNode State
   {
     get
@@ -164,13 +187,12 @@ public static class PDP8
       root.Children.Add(Console.State);
       root.Children.Add(Cpu.State);
 
-      foreach (IODevice dev in Devices)
-        if (dev != null)
-        {
-          XmlLiteNode state = dev.State;
-          if (state != null)
-            root.Children.Add(state);
-        }
+      foreach (IODevice dev in uniqueDevices)
+      {
+        XmlLiteNode state = dev.State;
+        if (state != null)
+          root.Children.Add(state);
+      }
 
       root.Children.Add(cycleTimeQueue.State);
       root.Children.Add(realTimeQueue.State);
@@ -182,19 +204,27 @@ public static class PDP8
 
     set
     {
-      CheckTag(value, "PDP-8");
+      try
+      {
+        CheckTag(value, "PDP-8");
 
-      Console.State = value["console"];
-      Cpu.State = value["cpu"];
+        Console.State = value["console"];
+        Cpu.State = value["cpu"];
 
-      foreach (IODevice dev in Devices)
-        if (dev != null && dev.XmlTag != "")
-          dev.State = value[dev.XmlTag];
+        foreach (IODevice dev in uniqueDevices)
+          if (dev.XmlTag != "" && value[dev.XmlTag] != null)
+            dev.State = value[dev.XmlTag];
 
-      cycleTimeQueue.State = value["cycleQ"];
-      realTimeQueue.State = value["timeQ"];
+        cycleTimeQueue.State = value["cycleQ"];
+        realTimeQueue.State = value["timeQ"];
 
-      Core.State = value["core"];
+        Core.State = value["core"];
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show(string.Format("Load state failure: {0}, resetting all state", ex.Message));
+        MasterReset();
+      }
     }
   }
 

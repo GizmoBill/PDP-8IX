@@ -103,8 +103,6 @@ namespace CSharpCommon
 
     static void write(IXmlElement xml, TextWriter tw, int level, int indent)
     {
-      string spaces = new string(' ', level * indent);
-
       Dictionary<string, string> attributes = xml.Attributes;
       string a = string.Empty;
       if (attributes != null)
@@ -112,6 +110,13 @@ namespace CSharpCommon
           a += string.Format(" {0}='{1}'", key, attributes[key]);
 
       string v = XmlUtil.xmlText(xml.Value);
+
+      bool noIndent = xml.Attributes != null && xml.Attributes.ContainsKey("noIndent");
+      string spaces = string.Empty;
+      if (noIndent)
+        indent = 0;
+      else
+        spaces = new string(' ', level * indent);
 
       if (v == string.Empty && !xml.HasChildren)
       {
@@ -133,20 +138,15 @@ namespace CSharpCommon
       }
       else
       {
-        bool noIndent = xml.Attributes != null && xml.Attributes.ContainsKey("noIndent");
-
         string spaces1 = new string(' ', (level + 1) * indent);
 
-        if (!noIndent)
+        string[] lines = v.Split('\n');
+        v = string.Empty;
+        foreach (string line in lines)
         {
-          string[] lines = v.Split('\n');
-          v = string.Empty;
-          foreach (string line in lines)
-          {
-            string s = line.Trim();
-            if (s != string.Empty)
-              v += spaces1 + s + Environment.NewLine;
-          }
+          string s = line.Trim();
+          if (s != string.Empty)
+            v += spaces1 + s + Environment.NewLine;
         }
 
         tw.Write(string.Format("{0}<{1}{2}>{3}{4}", spaces, xml.Tag, a, Environment.NewLine, v));

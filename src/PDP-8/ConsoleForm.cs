@@ -17,25 +17,40 @@ namespace PDP_8
 {
   public partial class ConsoleForm : Form
   {
+    string docFile_ = null;
+    string documentFilename
+    {
+      get => docFile_;
+      set
+      {
+        docFile_ = value;
+        if (docFile_ == null)
+          this.Text = "Untitled";
+        else
+          this.Text = Path.GetFileNameWithoutExtension(docFile_);
+      }
+    }
+
+    // Forms
     private ASR38 tty1;
 
     private ASR38 tty2;
 
-    private RK05Form rk05Form = null;
-
-    private RealTimeClock rtClock;
-
-    private IntervalTimer intervaTimer;
+    private RK05Form rk05Form;
 
     private HRPForm hrpForm = new HRPForm();
 
-    private SupervisorCall svc;
+    private Tek611Form tek611Form = new Tek611Form();
 
     private FrontPanel frontPanel = new FrontPanel();
 
     private Listing listingForm = new Listing();
 
-    private RK05 rk05 { get { return rk05Form.RK05; } }
+    // *****************
+    // *               *
+    // *  Constructor  *
+    // *               *
+    // *****************
 
     public ConsoleForm()
     {
@@ -51,10 +66,7 @@ namespace PDP_8
 
       rk05Form = new RK05Form();
 
-      rtClock = new RealTimeClock();
-      intervaTimer = new IntervalTimer();
-
-      svc = new SupervisorCall();
+      documentFilename = null;
 
       updateCheapPanel();
     }
@@ -93,11 +105,6 @@ namespace PDP_8
     // *  File Menu  *
     // *             *
     // ***************
-
-    private void loadListingToolStripMenuItem_Click(object sender, EventArgs e)
-    {
-      splitListing(false, false, true);
-    }
 
     // Force upper case and CR/LF line endings
     private void convertToPAL8ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -161,19 +168,58 @@ namespace PDP_8
       }
     }
 
+    // ***********************************
+    // *                                 *
+    // *  Listing Commands in File Menu  *
+    // *                                 *
+    // ***********************************
+
+    private void loadListingToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      splitListing(false, false, true, true);
+    }
+
     private void splitListingToolStripMenuItem_Click(object sender, EventArgs e)
     {
-      splitListing(true, true, false);
+      splitListing(true, true, false, false);
     }
 
     private void writeSourceToolStripMenuItem_Click(object sender, EventArgs e)
     {
-      splitListing(false, true, false);
+      splitListing(false, true, false, false);
     }
 
     private void writeBinaryToolStripMenuItem_Click(object sender, EventArgs e)
     {
-      splitListing(true, false, false);
+      splitListing(true, false, false, false);
+    }
+
+    private void readListingToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      splitListing(false, false, false, true);
+    }
+
+    // ****************************
+    // *                          *
+    // *  Documents in File Menu  *
+    // *                          *
+    // ****************************
+
+    public void Reset()
+    {
+      tty1.Reset();
+      tty2.Reset();
+
+      switchText.Text = "000000";
+      documentFilename = null;
+
+      cycleCount = 0;
+      realTime = 0;
+    }
+
+    private void newToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      MasterReset();
     }
 
     private void openToolStripMenuItem_Click(object sender, EventArgs e)
@@ -184,7 +230,19 @@ namespace PDP_8
       {
         XmlLiteNode root = XmlLiteNode.ReadFromFile(ofd.FileName);
         PDP8.State = root["PDP-8"];
+        documentFilename = ofd.FileName;
       }
+    }
+
+    private void saveToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      if (documentFilename != null)
+      {
+        XmlLiteNode root = PDP8.State;
+        XmlWriter.WriteFile(root, documentFilename, true, 2);
+      }
+      else
+        saveAsToolStripMenuItem_Click(sender, e);
     }
 
     private void saveAsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -195,6 +253,7 @@ namespace PDP_8
       {
         XmlLiteNode root = PDP8.State;
         XmlWriter.WriteFile(root, sfd.FileName, true, 2);
+        documentFilename = sfd.FileName;
       }
     }
 
@@ -245,6 +304,12 @@ namespace PDP_8
       hrpForm.BringToFront();
     }
 
+    private void tektronix611ToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      tek611Form.Show();
+      tek611Form.BringToFront();
+    }
+
     // ******************
     // *                *
     // *  Analyze Menu  *
@@ -260,6 +325,11 @@ namespace PDP_8
     private void recordToolStripMenuItem_Click(object sender, EventArgs e)
     {
       Cpu.EventRecorder.Enable = recordToolStripMenuItem.Checked;
+    }
+
+    private void recordOnlyBreaksToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      Cpu.EventRecorder.OnlyBreaks = recordOnlyBreaksToolStripMenuItem.Checked;
     }
 
     private void firstEventToolStripMenuItem_Click(object sender, EventArgs e)
@@ -398,11 +468,11 @@ namespace PDP_8
     // *                                         *
     // *******************************************
 
-    void splitListing(bool writeBinary, bool writeSource, bool load)
+    void splitListing(bool writeBinary, bool writeSource, bool loadCore, bool loadListing)
     {
       OpenFileDialog ofd = new OpenFileDialog();
       ofd.Filter = "PAL-8 Listing|*.ls*";
-      if (load && !writeSource)
+      if (loadCore && !writeSource)
         ofd.Filter += "|Windows Binary|*.bin|OS-8 Binary|*.BN";
       if (ofd.ShowDialog() == DialogResult.OK)
       {
@@ -412,7 +482,7 @@ namespace PDP_8
         List<string> source = writeSource ? new List<string>() : null;
         List<string> extra = new List<string>();
 
-        bool generateListing = load &&
+        bool generateListing = loadListing &&
           Path.GetExtension(ofd.FileName).Substring(1, 2).Equals("ls", StringComparison.OrdinalIgnoreCase);
 
         Dictionary<int, int> addressMap = null;
@@ -477,7 +547,7 @@ namespace PDP_8
                 source.Add(s.Substring(13));
               }
 
-              if (load && !noPunch)
+              if ((loadCore | generateListing) && !noPunch)
               {
                 int address, data;
                 try
@@ -491,8 +561,11 @@ namespace PDP_8
                   continue;
                 }
 
-                PDP8.Core[address >> 12, address & 0xFFF] = data;
-                ++loadCount;
+                if (loadCore)
+                {
+                  PDP8.Core[address >> 12, address & 0xFFF] = data;
+                  ++loadCount;
+                }
 
                 if (generateListing)
                   addressMap.Add(address, i);
@@ -530,7 +603,7 @@ namespace PDP_8
           File.WriteAllLines(filename, source);
         }
 
-        if (extra.Count > 0)
+        if (extra.Count > 0 && (writeBinary | writeSource))
         {
           string filename = Path.Combine(Path.GetDirectoryName(ofd.FileName),
                                          Path.GetFileNameWithoutExtension(ofd.FileName) + extext);
@@ -540,7 +613,7 @@ namespace PDP_8
         if (generateListing)
           listingForm.Load(text, addressMap);
 
-        if (load)
+        if (loadCore)
           MessageBox.Show(string.Format("{0} locations loaded", loadCount));
         else
           MessageBox.Show("Done");
@@ -670,20 +743,47 @@ namespace PDP_8
       get
       {
         XmlLiteNode root = new XmlLiteNode("console");
+
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(this, "consoleForm"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tty1, "tty1Form"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tty2, "tty2Form"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(rk05Form, "rk05Form"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(frontPanel, "frontPanel"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(hrpForm, "hrpForm"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(listingForm, "listing"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tek611Form, "tek611"));
+
         root.Children.Add(CpuTime);
         root.Children.Add(tty1.State);
         root.Children.Add(tty2.State);
-        root.Children.Add(hrpForm.State);
+
+        if (documentFilename != null)
+          root.Children.Add(new XmlLiteNode("docfile", documentFilename));
+
         return root;
       }
 
       set
       {
         CheckTag(value, "console");
+
+        XmlLiteNode root = value;
+        CSharpCommon.PreserveState.SetFormState(this, root, "consoleForm");
+        CSharpCommon.PreserveState.SetFormState(tty1, root, "tty1Form");
+        CSharpCommon.PreserveState.SetFormState(tty2, root, "tty2Form");
+        CSharpCommon.PreserveState.SetFormState(rk05Form, root, "rk05Form");
+        CSharpCommon.PreserveState.SetFormState(frontPanel, root, "frontPanel");
+        CSharpCommon.PreserveState.SetFormState(hrpForm, root, "hrpForm");
+        CSharpCommon.PreserveState.SetFormState(listingForm, root, "listing");
+        CSharpCommon.PreserveState.SetFormState(tek611Form, root, "tek611");
+
         CpuTime = value["time"];
         tty1.State = value[tty1.XmlTag];
         tty2.State = value[tty2.XmlTag];
-        hrpForm.State = value["hrp"];
+
+        XmlLiteNode docfile = root["docFile"];
+        documentFilename = docfile != null ? docfile.Value : null;
+
       }
     }
 
@@ -693,41 +793,41 @@ namespace PDP_8
     // *                  *
     // ********************
 
-    private string stateFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                                            "PDP-8.txt");
+    private string stateFile1 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                                             "PDP-8.txt");
+
+    private string stateFile2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                                             "PDP-8v2.txt");
 
     private void saveState()
     {
-      XmlLiteNode root = new XmlLiteNode("PDP-8I");
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(this, "consoleForm"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tty1, "tty1Form"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tty2, "tty2Form"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(rk05Form, "rk05Form"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(frontPanel, "frontPanel"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(hrpForm, "hrpForm"));
-      root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(listingForm, "listing"));
-      CSharpCommon.XmlWriter.WriteFile(root, stateFile, false, 2);
+      CSharpCommon.XmlWriter.WriteFile(PDP8.State, stateFile2, false, 2);
     }
 
-    private void restoreState()
+    private void restoreState(string file)
     {
-      if (File.Exists(stateFile))
-      {
-        XmlLiteNode root = XmlLiteNode.ReadFromFile(stateFile)["PDP-8I"];
-        CSharpCommon.PreserveState.SetFormState(this, root, "consoleForm");
-        CSharpCommon.PreserveState.SetFormState(tty1, root, "tty1Form");
-        CSharpCommon.PreserveState.SetFormState(tty2, root, "tty2Form");
-        CSharpCommon.PreserveState.SetFormState(rk05Form, root, "rk05Form");
-        CSharpCommon.PreserveState.SetFormState(frontPanel, root, "frontPanel");
-        CSharpCommon.PreserveState.SetFormState(hrpForm, root, "hrpForm");
-        CSharpCommon.PreserveState.SetFormState(listingForm, root, "listing");
-      }
+      XmlLiteNode root = XmlLiteNode.ReadFromFile(file)["PDP-8"];
+      PDP8.State = root;
     }
 
     private void ConsoleForm_FormClosing(object sender, FormClosingEventArgs e)
     {
-      if (e.CloseReason == CloseReason.UserClosing)
+      if (e.CloseReason == CloseReason.UserClosing && documentFilename != null)
       {
+        string msg = string.Format("Save changes to {0}?", Text);
+        switch (MessageBox.Show(msg, "Save Changes", MessageBoxButtons.YesNoCancel))
+        {
+          case DialogResult.Yes:
+            saveAsToolStripMenuItem.PerformClick();
+            break;
+
+          case DialogResult.No:
+            break;
+
+          case DialogResult.Cancel:
+            e.Cancel = true;
+            return;
+        }
       }
 
       saveState();
@@ -736,7 +836,27 @@ namespace PDP_8
 
     private void ConsoleForm_Shown(object sender, EventArgs e)
     {
-      restoreState();
+      string[] args = Environment.GetCommandLineArgs();
+      if (args.Length >= 2 && File.Exists(args[1]))
+      {
+        string file = args[1];
+        documentFilename = args[1];
+        restoreState(file);
+      }
+      else if (File.Exists(stateFile2))
+        restoreState(stateFile2);
+      else if (File.Exists(stateFile1))
+      {
+        XmlLiteNode root = XmlLiteNode.ReadFromFile(stateFile1)["PDP-8I"];
+        CSharpCommon.PreserveState.SetFormState(this, root, "consoleForm");
+        CSharpCommon.PreserveState.SetFormState(tty1, root, "tty1Form");
+        CSharpCommon.PreserveState.SetFormState(tty2, root, "tty2Form");
+        CSharpCommon.PreserveState.SetFormState(rk05Form, root, "rk05Form");
+        CSharpCommon.PreserveState.SetFormState(frontPanel, root, "frontPanel");
+        CSharpCommon.PreserveState.SetFormState(hrpForm, root, "hrpForm");
+        CSharpCommon.PreserveState.SetFormState(listingForm, root, "listing");
+      }
+
       runTimer.Enabled = true;
       rk05Form.LoadDrives();
     }

@@ -46,6 +46,15 @@ namespace PDP_8
       clearScreen();
     }
 
+    public void Reset()
+    {
+      paperText.Text = string.Empty;
+      clearScreen();
+      scrollWindowTop = 0;
+      scrollWindowBottom = screenHt - 1;
+      escapeState = EscapeState.Idle;
+    }
+
     public void SetIO(int keyAddr, int printAddr)
     {
       keyboard = new CharIn(keyAddr, kbFlagChanged);
