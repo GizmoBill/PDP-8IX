@@ -19,7 +19,7 @@ namespace PDP_8
 
     Bitmap bmp;
 
-    byte[,] plotArea = new byte[512, 512];
+    byte[,] plotArea = new byte[520 / 8, 513];
 
     private bool nonStoreMode { get { return nonStoreCheck.Checked; } }
 
@@ -36,7 +36,7 @@ namespace PDP_8
 
       tek611 = new Tek611(this);
 
-      bmp = new Bitmap(512, 512, PixelFormat.Format1bppIndexed);
+      bmp = new Bitmap(520, 513, PixelFormat.Format1bppIndexed);
       ColorPalette pal = bmp.Palette;
       pal.Entries[0] = Color.Black;
       pal.Entries[1] = Color.White;
@@ -63,14 +63,20 @@ namespace PDP_8
 
     public void Plot(int x, int y)
     {
+      const int pixSize = 2;
+
       x >>= 1;
-      y = bmp.Height - 1 - (y >> 1);
+      y = bmp.Height - pixSize - (y >> 1);
 
       if ((uint)x >= bmp.Width || (uint)y >= bmp.Height)
         throw new ArgumentOutOfRangeException("Pixel coordinates out of bounds.");
 
-      int bit = 1 << ((x & 7) ^ 7);
-      plotArea[x >> 3, y] |= (byte)bit;
+      for (int dy = 0; dy < pixSize; ++dy)
+        for (int dx = 0; dx < pixSize; ++dx)
+        {
+          int bit = 1 << ((x + dx & 7) ^ 7);
+          plotArea[(x + dx) >> 3, y + dy] |= (byte)bit;
+        }
 
       setScreenChanged();
     }

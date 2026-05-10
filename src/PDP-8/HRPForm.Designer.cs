@@ -29,8 +29,8 @@
     private void InitializeComponent()
     {
       sevenSegLabel = new Label();
-      pictureBox1 = new PictureBox();
       groupBox1 = new GroupBox();
+      scan66Check = new CheckBox();
       wr66ElNumeric = new NumericUpDown();
       wr66AzNumeric = new NumericUpDown();
       label3 = new Label();
@@ -38,6 +38,7 @@
       wr66AzVelLabel = new Label();
       wr66ElVelLabel = new Label();
       groupBox2 = new GroupBox();
+      scan73Check = new CheckBox();
       wr73ElNumeric = new NumericUpDown();
       wr73AzNumeric = new NumericUpDown();
       label4 = new Label();
@@ -64,11 +65,13 @@
       intTNPLabel = new Label();
       groupBox3 = new GroupBox();
       groupBox4 = new GroupBox();
+      ppiCheck = new CheckBox();
       groupBox5 = new GroupBox();
       panel1 = new Panel();
       aToD1Track = new TrackBar();
       aToD2Track = new TrackBar();
-      ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+      autoEl66Check = new CheckBox();
+      autoEl73Check = new CheckBox();
       groupBox1.SuspendLayout();
       ((System.ComponentModel.ISupportInitialize)wr66ElNumeric).BeginInit();
       ((System.ComponentModel.ISupportInitialize)wr66AzNumeric).BeginInit();
@@ -95,19 +98,11 @@
       sevenSegLabel.Text = "00";
       sevenSegLabel.TextAlign = ContentAlignment.MiddleCenter;
       // 
-      // pictureBox1
-      // 
-      pictureBox1.Image = Properties.Resources._160406_F_LA452_003;
-      pictureBox1.Location = new Point(286, 459);
-      pictureBox1.Name = "pictureBox1";
-      pictureBox1.Size = new Size(142, 165);
-      pictureBox1.SizeMode = PictureBoxSizeMode.Zoom;
-      pictureBox1.TabIndex = 15;
-      pictureBox1.TabStop = false;
-      // 
       // groupBox1
       // 
       groupBox1.BackColor = Color.FromArgb(160, 192, 230);
+      groupBox1.Controls.Add(autoEl66Check);
+      groupBox1.Controls.Add(scan66Check);
       groupBox1.Controls.Add(wr66ElNumeric);
       groupBox1.Controls.Add(wr66AzNumeric);
       groupBox1.Controls.Add(label3);
@@ -117,16 +112,27 @@
       groupBox1.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
       groupBox1.Location = new Point(241, 12);
       groupBox1.Name = "groupBox1";
-      groupBox1.Size = new Size(240, 127);
+      groupBox1.Size = new Size(240, 175);
       groupBox1.TabIndex = 16;
       groupBox1.TabStop = false;
       groupBox1.Text = "WR66";
       // 
+      // scan66Check
+      // 
+      scan66Check.AutoSize = true;
+      scan66Check.Location = new Point(20, 128);
+      scan66Check.Name = "scan66Check";
+      scan66Check.Size = new Size(82, 32);
+      scan66Check.TabIndex = 13;
+      scan66Check.Text = "Scan";
+      scan66Check.UseVisualStyleBackColor = true;
+      scan66Check.CheckedChanged += scan66Check_CheckedChanged;
+      // 
       // wr66ElNumeric
       // 
-      wr66ElNumeric.DecimalPlaces = 1;
+      wr66ElNumeric.DecimalPlaces = 2;
       wr66ElNumeric.Increment = new decimal(new int[] { 5, 0, 0, 65536 });
-      wr66ElNumeric.Location = new Point(58, 81);
+      wr66ElNumeric.Location = new Point(58, 80);
       wr66ElNumeric.Maximum = new decimal(new int[] { 90, 0, 0, 0 });
       wr66ElNumeric.Name = "wr66ElNumeric";
       wr66ElNumeric.Size = new Size(100, 34);
@@ -170,7 +176,7 @@
       // 
       wr66AzVelLabel.BackColor = Color.White;
       wr66AzVelLabel.BorderStyle = BorderStyle.Fixed3D;
-      wr66AzVelLabel.Location = new Point(164, 38);
+      wr66AzVelLabel.Location = new Point(164, 36);
       wr66AzVelLabel.Name = "wr66AzVelLabel";
       wr66AzVelLabel.Size = new Size(68, 34);
       wr66AzVelLabel.TabIndex = 12;
@@ -180,7 +186,7 @@
       // 
       wr66ElVelLabel.BackColor = Color.White;
       wr66ElVelLabel.BorderStyle = BorderStyle.Fixed3D;
-      wr66ElVelLabel.Location = new Point(164, 81);
+      wr66ElVelLabel.Location = new Point(164, 80);
       wr66ElVelLabel.Name = "wr66ElVelLabel";
       wr66ElVelLabel.Size = new Size(68, 34);
       wr66ElVelLabel.TabIndex = 12;
@@ -189,6 +195,8 @@
       // groupBox2
       // 
       groupBox2.BackColor = Color.FromArgb(160, 192, 230);
+      groupBox2.Controls.Add(autoEl73Check);
+      groupBox2.Controls.Add(scan73Check);
       groupBox2.Controls.Add(wr73ElNumeric);
       groupBox2.Controls.Add(wr73AzNumeric);
       groupBox2.Controls.Add(label4);
@@ -196,12 +204,23 @@
       groupBox2.Controls.Add(wr73ElSetLabel);
       groupBox2.Controls.Add(wr73AzVelLabel);
       groupBox2.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
-      groupBox2.Location = new Point(241, 152);
+      groupBox2.Location = new Point(241, 205);
       groupBox2.Name = "groupBox2";
-      groupBox2.Size = new Size(240, 128);
+      groupBox2.Size = new Size(240, 175);
       groupBox2.TabIndex = 16;
       groupBox2.TabStop = false;
       groupBox2.Text = "WR73";
+      // 
+      // scan73Check
+      // 
+      scan73Check.AutoSize = true;
+      scan73Check.Location = new Point(20, 128);
+      scan73Check.Name = "scan73Check";
+      scan73Check.Size = new Size(82, 32);
+      scan73Check.TabIndex = 14;
+      scan73Check.Text = "Scan";
+      scan73Check.UseVisualStyleBackColor = true;
+      scan73Check.CheckedChanged += scan73Check_CheckedChanged;
       // 
       // wr73ElNumeric
       // 
@@ -251,7 +270,7 @@
       // 
       wr73ElSetLabel.BackColor = Color.White;
       wr73ElSetLabel.BorderStyle = BorderStyle.Fixed3D;
-      wr73ElSetLabel.Location = new Point(162, 80);
+      wr73ElSetLabel.Location = new Point(162, 81);
       wr73ElSetLabel.Name = "wr73ElSetLabel";
       wr73ElSetLabel.Size = new Size(68, 34);
       wr73ElSetLabel.TabIndex = 12;
@@ -261,7 +280,7 @@
       // 
       wr73AzVelLabel.BackColor = Color.White;
       wr73AzVelLabel.BorderStyle = BorderStyle.Fixed3D;
-      wr73AzVelLabel.Location = new Point(162, 38);
+      wr73AzVelLabel.Location = new Point(162, 36);
       wr73AzVelLabel.Name = "wr73AzVelLabel";
       wr73AzVelLabel.Size = new Size(68, 34);
       wr73AzVelLabel.TabIndex = 12;
@@ -481,17 +500,28 @@
       // groupBox4
       // 
       groupBox4.BackColor = Color.FromArgb(160, 192, 230);
+      groupBox4.Controls.Add(ppiCheck);
       groupBox4.Controls.Add(runCheck);
       groupBox4.Controls.Add(zeroButton);
       groupBox4.Controls.Add(radarSelButton);
       groupBox4.Controls.Add(esrCombo);
       groupBox4.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
-      groupBox4.Location = new Point(241, 293);
+      groupBox4.Location = new Point(239, 400);
       groupBox4.Name = "groupBox4";
-      groupBox4.Size = new Size(242, 151);
+      groupBox4.Size = new Size(242, 196);
       groupBox4.TabIndex = 22;
       groupBox4.TabStop = false;
       groupBox4.Text = "A Scope";
+      // 
+      // ppiCheck
+      // 
+      ppiCheck.AutoSize = true;
+      ppiCheck.Location = new Point(56, 151);
+      ppiCheck.Name = "ppiCheck";
+      ppiCheck.Size = new Size(137, 32);
+      ppiCheck.TabIndex = 19;
+      ppiCheck.Text = "Enable PPI";
+      ppiCheck.UseVisualStyleBackColor = true;
       // 
       // groupBox5
       // 
@@ -542,6 +572,27 @@
       aToD2Track.TickStyle = TickStyle.TopLeft;
       aToD2Track.Value = 2048;
       // 
+      // autoEl66Check
+      // 
+      autoEl66Check.AutoSize = true;
+      autoEl66Check.Location = new Point(108, 128);
+      autoEl66Check.Name = "autoEl66Check";
+      autoEl66Check.Size = new Size(111, 32);
+      autoEl66Check.TabIndex = 13;
+      autoEl66Check.Text = "Auto EL";
+      autoEl66Check.UseVisualStyleBackColor = true;
+      autoEl66Check.CheckedChanged += scan66Check_CheckedChanged;
+      // 
+      // autoEl73Check
+      // 
+      autoEl73Check.AutoSize = true;
+      autoEl73Check.Location = new Point(108, 128);
+      autoEl73Check.Name = "autoEl73Check";
+      autoEl73Check.Size = new Size(111, 32);
+      autoEl73Check.TabIndex = 15;
+      autoEl73Check.Text = "Auto EL";
+      autoEl73Check.UseVisualStyleBackColor = true;
+      // 
       // HRPForm
       // 
       AutoScaleDimensions = new SizeF(144F, 144F);
@@ -554,7 +605,6 @@
       Controls.Add(groupBox5);
       Controls.Add(groupBox4);
       Controls.Add(groupBox3);
-      Controls.Add(pictureBox1);
       Controls.Add(groupBox2);
       Controls.Add(groupBox1);
       Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -563,9 +613,8 @@
       MaximizeBox = false;
       Name = "HRPForm";
       StartPosition = FormStartPosition.Manual;
-      Text = "Hurricane Research Project & MIT";
+      Text = "HRP & MIT";
       FormClosing += HRPForm_FormClosing;
-      ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
       groupBox1.ResumeLayout(false);
       groupBox1.PerformLayout();
       ((System.ComponentModel.ISupportInitialize)wr66ElNumeric).EndInit();
@@ -589,13 +638,10 @@
 
     #endregion
     private Button tlsButton;
-    private PictureBox pictureBox1;
     private GroupBox groupBox1;
-    private NumericUpDown wr66ElNumeric;
     private Label label3;
     private Label label2;
     private GroupBox groupBox2;
-    private NumericUpDown wr73ElNumeric;
     private Label label4;
     private Label label5;
     private Button nextButton;
@@ -610,15 +656,11 @@
     private CheckBox runCheck;
     private Button spyButton;
     private Button radarSelButton;
-    public Label wr73AzVelLabel;
-    public Label wr73ElSetLabel;
     public Label oswRadarSelLabel;
     public Label intSkipLabel;
     public Label intResLabel;
     public Label intPulsesLabel;
     public Label intTNPLabel;
-    public Label wr66AzVelLabel;
-    public Label wr66ElVelLabel;
     private GroupBox groupBox3;
     private GroupBox groupBox4;
     private GroupBox groupBox5;
@@ -629,5 +671,16 @@
     private TrackBar aToD2Track;
     public NumericUpDown wr66AzNumeric;
     public NumericUpDown wr73AzNumeric;
+    private Label wr66AzVelLabel;
+    private Label wr66ElVelLabel;
+    private Label wr73AzVelLabel;
+    private Label wr73ElSetLabel;
+    private CheckBox ppiCheck;
+    private CheckBox scan66Check;
+    private CheckBox scan73Check;
+    public NumericUpDown wr66ElNumeric;
+    public NumericUpDown wr73ElNumeric;
+    private CheckBox autoEl66Check;
+    private CheckBox autoEl73Check;
   }
 }

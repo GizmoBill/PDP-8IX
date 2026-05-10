@@ -15,9 +15,12 @@ using Accessibility;
 using CSharpCommon;
 using Microsoft.VisualBasic.Devices;
 using PDP_8;
+using System;
+using System.Data;
 using System.Diagnostics;
 using System.Security.Policy;
 using System.Text;
+using System.Threading.Channels;
 using static PDP8;
 using static XmlLiteNode;
 
@@ -84,6 +87,7 @@ public struct DeviceConfiguration
 // *               *
 // *****************
 
+// All times are in whatever units are used by the client for the Time property.
 public class ClockQueue
 {
   private double time;
@@ -112,19 +116,39 @@ public class ClockQueue
     }
   }
 
-  public void CallMe(string id, double fromNow)
+  private int indexOf(string id)
   {
-    int i;
-    for (i = 0; i < queue.Count; ++i)
+    for (int i = 0; i < queue.Count; ++i)
       if (queue[i].Item2 == id)
-      {
-        queue.RemoveAt(i);
-        break;
-      }
+        return i;
+    return -1;
+  }
 
+  // Schedule a callback. 
+  // There can be no more than one scheduled callback for each registered
+  // ID. If CallMe is called for an ID already scheduled, the existing one
+  // is discarded if keepClosest is false or the existing one is farther from
+  // the current time than the new one. Otherwise the new one is discarded.
+  public void CallMe(string id, double fromNow, bool keepClosest)
+  {
     double wakeTime = Time + fromNow;
-    for (i = 0; i < queue.Count && queue[i].Item1 > wakeTime; ++i) ;
-    queue.Insert(i, (wakeTime, id));
+
+    int index = indexOf(id);
+    if (index >= 0)
+    {
+      if (!keepClosest || wakeTime < queue[index].Item1)
+        queue.RemoveAt(index);
+      else
+        return;
+    }
+
+    for (index = 0; index < queue.Count && queue[index].Item1 > wakeTime; ++index) ;
+    queue.Insert(index, (wakeTime, id));
+  }
+
+  public bool IsScheduled(string id)
+  {
+    return indexOf(id) >= 0;
   }
 
   public XmlLiteNode State
@@ -139,7 +163,8 @@ public class ClockQueue
 
     set
     {
-      CheckTag(value, xmlTag);
+      if (CheckTag(value, xmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       time = double.Parse(ph[0]);
@@ -206,7 +231,8 @@ public class IOFlag
 
     set
     {
-      CheckTag(value, "allFlags");
+      if (CheckTag(value, "allFlags"))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -295,7 +321,8 @@ public class BreakPort
 
     set
     {
-      CheckTag(value, "breakPort");
+      if (CheckTag(value, "breakPort"))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i <  ph.Count; ++i)
@@ -366,7 +393,8 @@ public class PriorityInterrupt : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -494,7 +522,8 @@ public class CharOut : IODevice
     get { return new XmlLiteNode(XmlTag, string.Format("flag = {0};", ready.Flag)); }
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -595,7 +624,8 @@ public class CharIn : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -701,7 +731,8 @@ public class RK05 : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value["state"].Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -714,7 +745,7 @@ public class RK05 : IODevice
           case "changed":
             string[] s = ph[i].Split(',', StringSplitOptions.RemoveEmptyEntries);
             for (int drive = 0; drive < 4; ++drive)
-              driveChanged[i] = bool.Parse(s[drive]);
+              setChanged(i, bool.Parse(s[drive]));
             break;
 
           default:
@@ -853,7 +884,6 @@ public class RK05 : IODevice
           if ((command & 0x40) != 0)
             for (int i = 0; i < 128; ++i, ++diskIndex)
               diskImages[driveNum, diskIndex] = 0;
-          // RK05.setModified driveNum, True
         }
 
       }
@@ -907,6 +937,508 @@ public class RK05 : IODevice
   }
 }
 
+// *************
+// *           *
+// *  DECtape  *
+// *           *
+// *************
+
+public class TC01 : IODevice
+{
+  // Timing data from Small Computer Handbook, 1970, p 109. Assume read/write
+  // only moving forward. A reverse read/write seems supported by statusA, but
+  // the words order would be backwards because CA only counts up. Assume
+  // constant acceleration for start/stop, 2x for turnaround based on timing.
+  // At read/write/search speed, blocks transferr every 18.2 ms = 54.95
+  // blocks/sec. To start/stop in 375 ms, distance needed is 1/2 a t^2.
+  // Let ss be a start/stop event, then distance =
+  // 0.5 * (375 ms/ss) / ( 18.2 blocks/ms) = 10.3 blocks/ss.
+  const float blockTime = 18200f;
+  const float wordTime = 333.3f;
+  const float startStopTime = 375000f;
+  const int startStopBlocks = 10;
+
+  const int blocksPerTape = 1471;
+  const int installedDrives = 2;
+
+  const int goBit        = 0x080;
+  const int dirBit       = 0x100;
+  const int intEnableBit = 0x004;
+  const int clearErrBit  = 0x002;
+  const int clearDoneBit = 0x001;
+  const int endOfTapeBit = 0xA00;
+  const int selectErrBit = 0x900;
+  const int timingErrBit = 0x840;
+
+  DECtapeForm dtForm;
+
+  private IOFlag ready;
+
+  private BreakPort breakPort;
+
+  // Motion from statusA. 0 stopped, 1 forward, -1 reverse.
+  private int motion
+  {
+    get
+    {
+      if (go)
+        return reverse ? -1 : 1;
+      return 0;
+    }
+  }
+
+  private int statusA;
+  private int statusB;
+
+  private int[] currentBlocks = new int[installedDrives];
+  private int currentBlock
+  {
+    get { return unitIndex >= 0 ? currentBlocks[unitIndex] : 0; }
+    set { if (unitIndex >= 0) currentBlocks[unitIndex] = value; }
+  }
+
+  private int currentWord;
+
+  // 2 tape drives, 1471 blocks/drive, 128 words/block
+  private short[,,] drives = new short[installedDrives, blocksPerTape, 128];
+
+  private bool[] tapeChanged = new bool[installedDrives];
+
+  private int unitIndex;  // Set by DTXA
+
+  private bool reverse { get { return (statusA & dirBit) != 0; } }
+
+  private bool go { get { return (statusA & goBit) != 0; } }
+
+  private int function { get { return (statusA >> 3) & 7; } }
+  
+  private bool interruptEnable { get { return (statusA & intEnableBit) != 0; } }
+
+  private void updateTapeFill(int index)
+  {
+    dtForm.SetTapeFill(index, 1.0f - (float)currentBlocks[index] / blocksPerTape);
+  }
+
+  private void updateTapeFill()
+  {
+    updateTapeFill(unitIndex);
+  }
+
+  private string actionId = "tc01";
+
+  public TC01(DECtapeForm form)
+  {
+    dtForm = form;
+
+    RegisterDevice(FromOctal("76"), this);
+    RegisterDevice(FromOctal("77"), this);
+
+    RegisterAction(actionId, wakeup);
+
+    ready = new IOFlag(GetChannel(FromOctal("76")));
+    breakPort = new BreakPort(2, true, false);
+    breakPort.MemAddr = FromOctal("7754");    // WC, CA locations
+
+    Reset();
+  }
+
+  public override XmlLiteNode State
+  {
+    get
+    {
+      XmlLiteNode state = new XmlLiteNode(XmlTag);
+      string s = string.Format("flag = {0};\n", ready.Flag);
+      s += string.Format("a = {0};\nb = {1};\n", statusA, statusB);
+      s += string.Format("word = {0};\nindex = {1};\n", currentWord, unitIndex);
+
+      s += "blocks = ";
+      for (int i = 0; i < installedDrives; ++i)
+      {
+        if (i > 0)
+          s += ',';
+        s += currentBlocks[i].ToString();
+      }
+      s += ";\n";
+
+      s += "changed = ";
+      for (int i = 0; i < installedDrives; ++i)
+      {
+        if (i > 0)
+          s += ',';
+        s += tapeChanged[i].ToString();
+      }
+      s += ";\n";
+
+      state.Children.Add(new XmlLiteNode("state", s));
+      state.Children.Add(breakPort.State);
+
+      return state;
+    }
+
+    set
+    {
+      if (CheckTag(value, XmlTag))
+        return;
+
+      ParamHolder ph = new ParamHolder(value["state"].Value);
+      for (int i = 0; i < ph.Count; ++i)
+        switch (ph.Name(i))
+        {
+          case "flag":
+            break;
+
+          case "a":
+            statusA = int.Parse(ph[i]);
+            break;
+
+          case "b":
+            statusB = int.Parse(ph[i]);
+            break;
+
+          case "block":
+            break;
+
+          case "blocks":
+            string[] c = ph[i].Split(',');
+            for (int t = 0; t < Math.Min(installedDrives, c.Length); ++t)
+            {
+              currentBlocks[t] = int.Parse(c[t]);
+              updateTapeFill(t);
+            }
+            break;
+
+          case "word":
+            currentWord = int.Parse(ph[i]);
+            break;
+
+          case "index":
+            unitIndex = int.Parse(ph[i]);
+            break;
+
+          case "changed":
+            c = ph[i].Split(',');
+            for (int t = 0; t < Math.Min(installedDrives, c.Length); ++t)
+              setChanged(t, bool.Parse(c[t]));
+            break;
+
+          default:
+            throw new Exception("Unknown tc01 parameter " + ph.Name(i));
+        }
+
+      breakPort.State = value["breakPort"];
+    }
+  }
+
+  public override string XmlTag => "tc01";
+
+  public override void Iot(int controlBits, ref int bus, out bool skip)
+  {
+    skip = false;
+    int oldMotion = motion;
+    int oldFunction = function;
+
+    switch ((Cpu.MBR >> 3) & 0x3F)
+    {
+      case 62:
+        // DTRA
+        if ((controlBits & 1) != 0)
+          bus |= statusA;
+
+        // DTCA
+        if ((controlBits & 2) != 0)
+          statusA = 0;
+
+        // DTXA
+        if ((controlBits & 4) != 0)
+        {
+          statusA ^= bus & 0xFFC;
+
+          if ((bus & clearDoneBit) == 0)
+            clearDone();
+
+          if ((bus & clearErrBit) == 0)
+            statusB &= 0x03F;
+
+          bus = 0;
+
+          setFlag();
+
+          unitIndex = dtForm.UnitIndex(statusA >> 9);
+
+          // Check for select error. Function not 0, 1, 2, or 4, or no
+          // drive selects the given unitNum
+          if ((function & -function) != function | unitIndex < 0)
+            statusB |= selectErrBit;
+
+          // Check for no tape
+          if (!dtForm.TapeLoaded(unitIndex))
+            statusB |= timingErrBit;
+
+          if ((statusB & 0x800) != 0)
+          {
+            statusA &= ~goBit;
+            setDone();
+            dtForm.SetSpeed(unitIndex, 0);
+            break;
+          }
+
+          execute(oldMotion, oldFunction);
+        }
+
+        break;
+
+      case 63:
+        // DTSF
+        if ((controlBits & 1) != 0)
+          skip = (statusB & 0x801) != 0;
+
+        // DTRB
+        if ((controlBits & 2) != 0)
+          bus |= statusB;
+
+        // DTLB
+        if ((controlBits & 4) != 0)
+        {
+          statusB = (statusB & ~0x038) | (bus & 0x038);
+          bus = 0;
+        }
+
+        break;
+
+      default:
+        throw new Exception(string.Format("Internal DECtape error {0}", ToOctal(Cpu.MBR)));
+    }
+  }
+
+  void setFlag()
+  {
+    ready.Flag = (statusB & 0x801) != 0 & interruptEnable;
+  }
+
+  void setDone()
+  {
+    statusB |= 1;
+    setFlag();
+  }
+
+  void clearDone()
+  {
+    statusB &= ~1;
+    setFlag();
+  }
+
+  void execute(int oldMotion, int oldFunction)
+  {
+    dtForm.SetBlock(currentBlock);
+
+    if (checkEndOfTape())
+      return;
+
+    if (go)
+    {
+      breakPort.MemField = (statusB >> 3) & 7;
+      breakPort.IncCAInhibit = function == 1;
+      breakPort.DataWrite = function != 4;
+      if (function == 4)
+        breakPort.Brq = true;
+
+      currentWord = 0;
+
+      if (motion != oldMotion)
+      {
+        if (oldMotion == 0)
+          currentBlock += motion * startStopBlocks;
+        CallMeReal(actionId, startStopTime);
+
+        dtForm.SetSpeed(unitIndex, motion);
+      }
+      else if (oldFunction == 1 & function == 1)
+      {
+        currentBlock += motion;
+        CallMeReal(actionId, blockTime);
+      }
+      else
+        wakeup();
+    }
+    else if (oldMotion != 0)
+    {
+      currentBlock += oldMotion * startStopBlocks;
+      dtForm.SetSpeed(unitIndex, 0);
+    }
+
+    updateTapeFill();
+  }
+
+  void wakeup()
+  {
+    dtForm.SetBlock(currentBlock);
+
+    if (checkEndOfTape())
+      return;
+
+    if (breakPort.Brq)
+      // break cycle not done, try again
+      CallMeReal(actionId, wordTime);
+    else
+      switch (function)
+      {
+        case 0:
+          currentBlock += motion;
+          CallMeReal(actionId, blockTime);
+          break;
+        
+        case 1:
+          if (currentBlock < 0 | currentBlock >= blocksPerTape)
+          {
+            currentBlock += motion;    // must be moving out of end zone
+            CallMeReal(actionId, blockTime);
+          }
+          else
+          {
+            breakPort.MemData = currentBlock;
+            breakPort.Brq = true;
+            setDone();
+          }
+          break;
+
+        case 2:
+          breakPort.MemData = drives[unitIndex, currentBlock, currentWord++];
+          breakPort.Brq = true;
+
+          if (currentWord == 128)
+          {
+            currentBlock += motion;
+            setDone();
+          }
+          else
+            CallMeReal(actionId, wordTime);
+          break;
+
+        case 4:
+          drives[unitIndex, currentBlock, currentWord++] = (short)breakPort.MemData;
+
+          if (currentWord == 128)
+          {
+            currentBlock += motion;
+            setChanged(unitIndex, true);
+            setDone();
+          }
+          else
+          {
+            breakPort.Brq = true;
+            CallMeReal(actionId, wordTime);
+          }
+
+          break;
+
+        default:
+          break;
+      }
+
+    updateTapeFill();
+  }
+
+  private bool checkEndOfTape()
+  {
+    if (currentBlock < 0 & motion < 0 |
+        currentBlock >= blocksPerTape & motion > 0)
+    {
+      currentBlock += motion * startStopBlocks;
+      statusA &= ~goBit;
+      statusB |= endOfTapeBit;
+      setDone();
+      updateTapeFill();
+      dtForm.SetSpeed(unitIndex, 0);
+      return true;
+    }
+
+    return false;
+  }
+
+  public override void Reset()
+  {
+    statusA = 0;
+    statusB = 0;
+    ready.Flag = false;
+    for (int i = 0; i < installedDrives; ++i)
+    {
+      currentBlocks[i] = 0;
+      updateTapeFill(i);
+    }
+  }
+
+  void setChanged(int unitIndex, bool changed)
+  {
+    tapeChanged[unitIndex] = changed;
+    dtForm.SetChanged(unitIndex, changed);
+  }
+
+  public void NewTape(int unitIndex)
+  {
+    for (int b = 0; b < blocksPerTape; ++b)
+      for (int w = 0; w < 128; ++w)
+        drives[unitIndex, b, w] = 0;
+
+    currentBlock = 0;
+    updateTapeFill(unitIndex);
+    setChanged(unitIndex, false);
+  }
+
+  public void LoadTape(int unitIndex, string filename)
+  {
+    if (!File.Exists(filename))
+      throw new Exception(string.Format("Tape file {0} does not exist", filename));
+
+    byte[] data = File.ReadAllBytes(filename);
+
+    if (data.Length % (2 * 128) != 0 | data.Length > (2 * 128) * blocksPerTape)
+      throw new Exception("Bad tape format");
+
+    int blocksUsed = data.Length / (2 * 128);
+
+    for (int b = 0, p = 0; b < blocksUsed; ++b)
+      for (int w = 0; w < 128; ++w, p += 2)
+        drives[unitIndex, b, w] = (short)(data[p] | (data[p + 1] << 8));
+
+    for (int b = blocksUsed; b < blocksPerTape; ++b)
+      for (int w = 0; w < 128; ++w)
+        drives[unitIndex, b, w] = 0;
+
+    setChanged(unitIndex, false);
+
+    currentBlock = 0;
+    updateTapeFill(unitIndex);
+  }
+
+  public void SaveTape(int unitIndex, string filename)
+  {
+    int blocksUsed = 0;
+    for (int b = blocksPerTape - 1; b > 0; --b)
+    {
+      for (int w = 0; w < 128; ++w)
+        if (drives[unitIndex, b, w] != 0)
+        {
+          blocksUsed = b + 1;
+          b = 0;
+          break;
+        }
+    }
+
+    byte[] data = new byte[2 * 128 * blocksUsed];
+    int p = 0;
+    for (int b = 0; b < blocksUsed; ++b)
+      for (int w = 0; w < 128; ++w)
+      {
+        data[p++] = (byte)(drives[unitIndex, b, w] & 0xFF);
+        data[p++] = (byte)(drives[unitIndex, b, w] >> 8);
+      }
+
+    File.WriteAllBytes(filename, data);
+
+    setChanged(unitIndex, false);
+  }
+}
+
 // ***********
 // *         *
 // *  Clock  *
@@ -935,7 +1467,8 @@ public class RealTimeClock : IODevice
     get { return new XmlLiteNode(XmlTag, string.Format("flag = {0};", ready.Flag)); }
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -1011,7 +1544,8 @@ public class IntervalTimer : IODevice
     }
     set
     {
-      CheckTag(value, XmlTag); ;
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -1103,7 +1637,8 @@ public class SupervisorCall : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -1147,8 +1682,6 @@ public class SupervisorCall : IODevice
 
       case 4:
         tsvcReady.Flag = !tsvcReady.Flag;
-        if (tsvcReady.Flag & (!Cpu.ION | Cpu.IRQ == 0))
-          illegalSVC();
         break;
 
       default:
@@ -1201,7 +1734,8 @@ public class AF01A : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
 
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
@@ -1277,6 +1811,7 @@ public class AF01A : IODevice
 public class HRP : IODevice
 {
   private HRPForm hrp;
+  private PPIForm ppiForm;
 
   int wr66Low_;
   int wr66High_;
@@ -1285,14 +1820,27 @@ public class HRP : IODevice
   int osw_;
   int sevenSeg_;
 
+  void sendWR66Vel()
+  {
+    // Get azv in degrees/integration period
+    float azv = (wr66Low & 0x0FF) - 128;
+    if (azv > 0)
+      azv /= 56f;
+    else if (azv < 0)
+      azv /= 24;
+
+    float elv = ((wr66High >> 4) & 0x0F0) | (wr66Low >> 8);
+
+    hrp.SetVel66(azv, elv);
+  }
+
   int wr66Low
   {
     get => wr66Low_;
     set
     {
       wr66Low_ = value;
-
-      hrp.wr66AzVelLabel.Text = ((wr66Low & 0x0FF) - 128).ToString();
+      //sendWR66Vel();
     }
   }
 
@@ -1302,8 +1850,7 @@ public class HRP : IODevice
     set
     {
       wr66High_ = value;
-
-      hrp.wr66ElVelLabel.Text = (((wr66High >> 4) & 0x0F0) | (wr66Low >> 8)).ToString();
+      sendWR66Vel();
     }
   }
 
@@ -1314,7 +1861,14 @@ public class HRP : IODevice
     {
       wr73AzV_ = value;
 
-      hrp.wr73AzVelLabel.Text = (512 - wr73AzV).ToString();
+      // Get azv in degrees/integration period
+      float azv = 512 - wr73AzV;
+      if (azv > 0)
+        azv /= 176f;
+      else if (azv < 0)
+        azv /= 192f;
+
+      hrp.SetAzVel73(azv);
     }
   }
 
@@ -1325,7 +1879,7 @@ public class HRP : IODevice
     {
       wr73El_ = value;
 
-      hrp.wr73ElSetLabel.Text = (wr73El * 360.0 / 4096.0 - 115.0).ToString();
+      hrp.SetEl73(wr73El * 360.0f / 4096.0f - 115.0f);
     }
   }
 
@@ -1353,9 +1907,10 @@ public class HRP : IODevice
 
   int eswSelect = 0;
 
-  public HRP(HRPForm hrpForm)
+  public HRP(HRPForm hrpForm, PPIForm ppiForm)
   {
     hrp = hrpForm;
+    this.ppiForm = ppiForm;
 
     RegisterDevice(FromOctal("11"), this);    // INA, read WR66 az, el
     RegisterDevice(FromOctal("12"), this);    // DNS, read WR73 az, el
@@ -1376,8 +1931,8 @@ public class HRP : IODevice
   {
     get
     {
-      string s = string.Format("wr66Low = {0};\nwr66High = {1};\n", wr66Low, wr66High);
-      s += string.Format("wr73AzV = {0};\nwr73El = {1};\n", wr73AzV, wr73El);
+      string s = string.Format("wr66Low2 = {0};\nwr66High2 = {1};\n", wr66Low, wr66High);
+      s += string.Format("wr73AzV2 = {0};\nwr73El2 = {1};\n", wr73AzV, wr73El);
       s += string.Format("osw = {0};\nseg7 = {1};\n", osw, sevenSeg);
       s += string.Format("eswSel = {0};\n", eswSelect);
       return new XmlLiteNode(XmlTag, s);
@@ -1385,24 +1940,32 @@ public class HRP : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
+
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
         switch (ph.Name(i))
         {
           case "wr66Low":
+          case "wr66High":
+          case "wr73AzV":
+          case "wr73El":
+            break;
+
+          case "wr66Low2":
             wr66Low = int.Parse(ph[i]);
             break;
 
-          case "wr66High":
+          case "wr66High2":
             wr66High = int.Parse(ph[i]);
             break;
 
-          case "wr73AzV":
+          case "wr73AzV2":
             wr73AzV = int.Parse(ph[i]);
             break;
 
-          case "wr73El":
+          case "wr73El2":
             wr73El = int.Parse(ph[i]);
             break;
 
@@ -1502,6 +2065,7 @@ public class HRP : IODevice
             // TIW, write to TI, skip if successful. Always skip to avoid hanging
             // in a wait loop at 23673. Wait loop at 15662 times out
             skip = true;
+            ppiForm.Ray(bus);
             break;
 
           default:
@@ -1587,6 +2151,10 @@ public class HRP : IODevice
       case "42":
         switch (controlBits)
         {
+          // Don't know what this does. Used only at 23643 in RADAR
+          case 1:
+            break;
+
           case 2:
             // PEL73, position WR73 elevation
             wr73El = bus;
@@ -1674,10 +2242,10 @@ public class HRP : IODevice
 
   public override void Reset()
   {
-    wr66Low = 0;
-    wr66High = 0;
-    wr73AzV = 0;
-    wr73El = 0;
+    wr66Low = 128;    // 0 az & el velocity
+    wr66High = 0x800;
+    wr73AzV = 512;    // 0 velocity
+    wr73El = 1314;    // 0.5 deg
     osw = 0;
     sevenSeg = 0;
   }
@@ -1731,37 +2299,61 @@ public class Integrator : IODevice
 
   bool wr73Selected { get { return (icw2 & 0x400) == 0; } }
 
-  // Synthetic radar data. A elliptical Gaussian centered at (x0, y0), at angle ang0,
-  // with stDev (xSigma, ySigma). The IOT instructions set range and angle, with
-  // range updated as bins are read. 
+  // Synthetic radar data. A 3D ellipsoid Gaussian centered at (x0, y0, z0), at
+  // angle ang0, with stDev (xSigma, ySigma, zSigma). The IOT instructions set
+  // range and spherical-cartesian transform, with range updated as bins are read.
   double range;
-  double angle;
+  double rx, ry, rz;
 
-  // Elliptical Gaussian parameters
-  double x0 = -40.0;
-  double y0 = 10;
-  double ang0 = MathUtil.Radians(15.0);
-  double xSigma = 6.0;
-  double ySigma = 60.0;
+  // Elliptical Gaussian parameters, distance in nmi.
+  const double x0 = -40.0;
+  const double y0 = 10;
+  const double z0 = 0.4;
+  const double ang0 = 15.0 / 180 * Math.PI;
+  const double xSigma = 8.0;
+  const double ySigma = 60.0;
+  const double zSigma = 2.0;
+  const double dbZMax = 64.0;
+  const double maxSigma = 2.0;
+  const int noiseLevel = 256;
+
+  double k1 { get { return wr73Selected ? 444 : 245; } }
+  double k2 { get { return wr73Selected ? 37 : 35; } }
 
   // Retrieve the synthetic bin at the current range and angle.
+  // RADAR bin processing:
+  //       bin - NOIZL + k1
+  // dbZ = ---------------- + PT + 20 log(range / 16)
+  //              k2
   int bin
   {
     get
     {
-      // Elliptical Gauss, 0 <= z <= 1
-      double x = range * Math.Cos(angle + ang0);
-      double y = range * Math.Sin(angle + ang0);
-      double z = MathUtil.square((x - x0) / xSigma) + MathUtil.square((y - y0) / ySigma);
-      z = Math.Exp(-0.5 * z);
+      // Ellipsoid Gauss, compute sigma
+      double x = (range * rx - x0) / xSigma;
+      double y = (range * ry - y0) / ySigma;
+      double z = (range * rz - z0) / zSigma;
 
-      // Add some noise, correct for power loss at range (emperical, not realistic),
-      // convert to integer bin value
-      z += grand.NextDouble();
-      z -= 0.2 * Math.Log10(Math.Max(range, 1));
-      z = Math.Max(z, 0);
-      return (int)(z * 768.0) + 192;
+      double sig2 = x * x + y * y + z * z;
+
+      double dbz = 0;
+      if (sig2 <= maxSigma * maxSigma)
+      {
+        // Not noise, get z, range attenuation, convert to bin units
+        z = dbZMax * Math.Exp(-0.5 * sig2);
+        z -= 20 * Math.Log10(range / 16.0);
+        z = Math.Max(z * k2 - k1, 0);
+      }
+
+      // Add some noise
+      return (int)(z + grand.NextDouble()) + noiseLevel;
     }
+  }
+
+  // In microsecs at PRF 250
+  public double IntegrationPeriod
+  {
+    get { return (icw2 & 0x07F) * 4000.0; }
   }
 
   public Integrator(HRPForm hrpForm)
@@ -1774,11 +2366,9 @@ public class Integrator : IODevice
     RegisterAction("integrator", integratorDone);
 
     grand.Mean = 0;
-    grand.Sigma = 0.02;
+    grand.Sigma = 24;
 
     Reset();
-
-    //test();
   }
 
   public override XmlLiteNode State
@@ -1792,7 +2382,9 @@ public class Integrator : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
+
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
         switch (ph.Name(i))
@@ -1836,11 +2428,17 @@ public class Integrator : IODevice
           case 6:
             // ICW2
             icw2 = bus;
-            range = binskip * binres;
-            decimal az = wr73Selected ? hrp.wr73AzNumeric.Value : hrp.wr66AzNumeric.Value;
-            angle = MathUtil.Radians(MathUtil.mod((double)(90 - az), 360));
+            range = (binskip + 1) * binres;
 
-            CallMeReal("integrator", (icw2 & 0x07F) * 4000.0);  // pulses at 250 PRF
+            double az = (double)(wr73Selected ? hrp.wr73AzNumeric.Value : hrp.wr66AzNumeric.Value);
+            az = MathUtil.Radians(90.0 - az) - ang0;
+            double el = MathUtil.Radians((double)(wr73Selected ? hrp.wr73ElNumeric.Value : hrp.wr66ElNumeric.Value));
+
+            rx = Math.Cos(az) * Math.Cos(el);
+            ry = Math.Sin(az) * Math.Cos(el);
+            rz = Math.Sin(el);
+
+            CallMeReal("integrator", IntegrationPeriod);
             break;
 
           default:
@@ -1888,22 +2486,6 @@ public class Integrator : IODevice
     icw1 = FromOctal("0121");
     icw2 = FromOctal("6240");
   }
-
-  void test()
-  {
-    Bitmap img = new Bitmap(250, 250);
-
-    for (int y = 0; y < img.Height; ++y)
-      for (int x = 0; x < img.Width; ++x)
-      {
-        range = MathUtil.EuclidDist(x - 0.5 * img.Width, y - 0.5 * img.Height);
-        angle = Math.Atan2(y - 0.5 * img.Height, x - 0.5 * img.Width);
-        int z = bin >> 2;
-        img.SetPixel(x, y, Color.FromArgb(z, z, z));
-      }
-
-    img.Save("testRadarImg.bmp");
-  }
 }
 
 // *********************************
@@ -1936,7 +2518,9 @@ public class Tek611 : IODevice
 
     set
     {
-      CheckTag(value, XmlTag);
+      if (CheckTag(value, XmlTag))
+        return;
+
       ParamHolder ph = new ParamHolder(value.Value);
       for (int i = 0; i < ph.Count; ++i)
         switch (ph.Name(i))

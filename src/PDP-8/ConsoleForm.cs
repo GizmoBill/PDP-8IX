@@ -38,13 +38,17 @@ namespace PDP_8
 
     private RK05Form rk05Form;
 
-    private HRPForm hrpForm = new HRPForm();
+    private HRPForm hrpForm;
 
     private Tek611Form tek611Form = new Tek611Form();
 
     private FrontPanel frontPanel = new FrontPanel();
 
     private Listing listingForm = new Listing();
+
+    private DECtapeForm dectapeForm = new DECtapeForm();
+
+    private PPIForm ppiForm;
 
     // *****************
     // *               *
@@ -65,6 +69,9 @@ namespace PDP_8
       tty2.SetIO(FromOctal("13"), FromOctal("14"));
 
       rk05Form = new RK05Form();
+
+      ppiForm = new PPIForm();
+      hrpForm = new HRPForm(ppiForm);
 
       documentFilename = null;
 
@@ -105,6 +112,11 @@ namespace PDP_8
     // *  File Menu  *
     // *             *
     // ***************
+
+    private void fileToolStripMenuItem_DropDownOpening(object sender, EventArgs e)
+    {
+      loadListingToolStripMenuItem.Enabled = !Cpu.Run;
+    }
 
     // Force upper case and CR/LF line endings
     private void convertToPAL8ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -209,6 +221,7 @@ namespace PDP_8
     {
       tty1.Reset();
       tty2.Reset();
+      dectapeForm.Reset();
 
       switchText.Text = "000000";
       documentFilename = null;
@@ -219,6 +232,8 @@ namespace PDP_8
 
     private void newToolStripMenuItem_Click(object sender, EventArgs e)
     {
+      if (offerToSave())
+        return;
       MasterReset();
     }
 
@@ -228,6 +243,8 @@ namespace PDP_8
       ofd.Filter = "PDP-8 Files|*.pdp8";
       if (ofd.ShowDialog() == DialogResult.OK)
       {
+        if (offerToSave())
+          return;
         XmlLiteNode root = XmlLiteNode.ReadFromFile(ofd.FileName);
         PDP8.State = root["PDP-8"];
         documentFilename = ofd.FileName;
@@ -255,6 +272,28 @@ namespace PDP_8
         XmlWriter.WriteFile(root, sfd.FileName, true, 2);
         documentFilename = sfd.FileName;
       }
+    }
+
+    bool offerToSave()
+    {
+      if (documentFilename != null)
+      {
+        string msg = string.Format("Save changes to {0}?", Text);
+        switch (MessageBox.Show(msg, "Save Changes", MessageBoxButtons.YesNoCancel))
+        {
+          case DialogResult.Yes:
+            saveToolStripMenuItem.PerformClick();
+            break;
+
+          case DialogResult.No:
+            break;
+
+          case DialogResult.Cancel:
+            return true;
+        }
+      }
+
+      return false;
     }
 
     // ******************
@@ -308,6 +347,18 @@ namespace PDP_8
     {
       tek611Form.Show();
       tek611Form.BringToFront();
+    }
+
+    private void dECtapeToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      dectapeForm.Show();
+      dectapeForm.BringToFront();
+    }
+
+    private void pPIToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      ppiForm.Show();
+      ppiForm.BringToFront();
     }
 
     // ******************
@@ -567,7 +618,7 @@ namespace PDP_8
                   ++loadCount;
                 }
 
-                if (generateListing)
+                if (generateListing && s.Length > 13 && !addressMap.ContainsKey(address))
                   addressMap.Add(address, i);
               }
               break;
@@ -656,28 +707,49 @@ namespace PDP_8
       int lightSampleCounter = 0;
       bool doLights = frontPanel.Visible;
 
-      for (cycles = 0; cycles < cycleBurst; ++cycles)
+#if !DEBUG
+      try
+#endif
       {
-        Cpu.Cycle();
-
-        if (doLights && ++lightSampleCounter == lightSampleCounts[lightSampleIndex])
+        for (cycles = 0; cycles < cycleBurst; ++cycles)
         {
-          frontPanel.ProcessLights();
-          lightSampleCounter = 0;
-          lightSampleIndex = (lightSampleIndex + 1) % lightSampleCounts.Length;
-        }
+          Cpu.Cycle();
 
-        if (!Cpu.IntSuppress)
-        {
-          ++cycleCount;
-          realTime += cycleTimeTarget;
-          SetClockQueueTime(cycleCount, realTime);
-        }
+          if (frontPanel.SingleStep ||
+              frontPanel.SingleInstr && Cpu.CurrentCycle == CPU.CycleState.fetch)
+          {
+            Cpu.Run = false;
+            Cpu.IntSuppress = true;
+          }
 
-        // Stopwatch is slow
-        if ((cycles % 64) == 0 && cycleTimer.Elapsed.TotalMicroseconds >= 0.98 * runTimerInterval)
-          break;
+          if (doLights && ++lightSampleCounter == lightSampleCounts[lightSampleIndex])
+          {
+            frontPanel.ProcessLights();
+            lightSampleCounter = 0;
+            lightSampleIndex = (lightSampleIndex + 1) % lightSampleCounts.Length;
+          }
+
+          if (!Cpu.IntSuppress)
+          {
+            ++cycleCount;
+            realTime += cycleTimeTarget;
+            SetClockQueueTime(cycleCount, realTime);
+          }
+
+          // Stopwatch is slow
+          if ((cycles % 64) == 0 && cycleTimer.Elapsed.TotalMicroseconds >= 0.90 * runTimerInterval)
+            break;
+        }
       }
+#if !DEBUG
+      catch (Exception ex)
+      {
+        MasterReset();
+        MessageBox.Show(string.Format("{0}, resetting", ex.Message));
+        return;
+      }
+#endif
+
       cycleTimer.Stop();
 
       double t = cycleTimer.Elapsed.TotalMicroseconds;
@@ -714,7 +786,8 @@ namespace PDP_8
 
       set
       {
-        CheckTag(value, "time");
+        if (CheckTag(value, "time"))
+          return;
 
         ParamHolder ph = new ParamHolder(value.Value);
         for (int i = 0; i < ph.Count; ++i)
@@ -752,10 +825,14 @@ namespace PDP_8
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(hrpForm, "hrpForm"));
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(listingForm, "listing"));
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tek611Form, "tek611"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(dectapeForm, "dectape"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(ppiForm, "ppiForm"));
 
         root.Children.Add(CpuTime);
         root.Children.Add(tty1.State);
         root.Children.Add(tty2.State);
+        root.Children.Add(dectapeForm.State);
+        rk05Form.SaveDrives();
 
         if (documentFilename != null)
           root.Children.Add(new XmlLiteNode("docfile", documentFilename));
@@ -765,7 +842,8 @@ namespace PDP_8
 
       set
       {
-        CheckTag(value, "console");
+        if (CheckTag(value, "console"))
+          return;
 
         XmlLiteNode root = value;
         CSharpCommon.PreserveState.SetFormState(this, root, "consoleForm");
@@ -776,10 +854,14 @@ namespace PDP_8
         CSharpCommon.PreserveState.SetFormState(hrpForm, root, "hrpForm");
         CSharpCommon.PreserveState.SetFormState(listingForm, root, "listing");
         CSharpCommon.PreserveState.SetFormState(tek611Form, root, "tek611");
+        CSharpCommon.PreserveState.SetFormState(dectapeForm, root, "dectape");
+        CSharpCommon.PreserveState.SetFormState(ppiForm, root, "ppiForm");
 
         CpuTime = value["time"];
         tty1.State = value[tty1.XmlTag];
         tty2.State = value[tty2.XmlTag];
+        dectapeForm.State = value[DECtapeForm.XmlTag];
+        rk05Form.LoadDrives();
 
         XmlLiteNode docfile = root["docFile"];
         documentFilename = docfile != null ? docfile.Value : null;
@@ -812,26 +894,13 @@ namespace PDP_8
 
     private void ConsoleForm_FormClosing(object sender, FormClosingEventArgs e)
     {
-      if (e.CloseReason == CloseReason.UserClosing && documentFilename != null)
+      if (e.CloseReason == CloseReason.UserClosing && offerToSave())
       {
-        string msg = string.Format("Save changes to {0}?", Text);
-        switch (MessageBox.Show(msg, "Save Changes", MessageBoxButtons.YesNoCancel))
-        {
-          case DialogResult.Yes:
-            saveAsToolStripMenuItem.PerformClick();
-            break;
-
-          case DialogResult.No:
-            break;
-
-          case DialogResult.Cancel:
-            e.Cancel = true;
-            return;
-        }
+        e.Cancel = true;
+        return;
       }
 
       saveState();
-      rk05Form.SaveDrives();
     }
 
     private void ConsoleForm_Shown(object sender, EventArgs e)
@@ -855,18 +924,10 @@ namespace PDP_8
         CSharpCommon.PreserveState.SetFormState(frontPanel, root, "frontPanel");
         CSharpCommon.PreserveState.SetFormState(hrpForm, root, "hrpForm");
         CSharpCommon.PreserveState.SetFormState(listingForm, root, "listing");
+        rk05Form.LoadDrives();
       }
 
       runTimer.Enabled = true;
-      rk05Form.LoadDrives();
-    }
-
-    private void ConsoleForm_Resize(object sender, EventArgs e)
-    {
-      if (Visible)
-      {
-
-      }
     }
   }
 }

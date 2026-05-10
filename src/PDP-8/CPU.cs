@@ -162,7 +162,8 @@ namespace PDP_8
 
       set
       {
-        CheckTag(value, "core");
+        if (CheckTag(value, "core"))
+          return;
 
         string s = value.Value;
         for (int i = 0; i < s.Length; i = s.IndexOf('\n', i) + 1)
@@ -408,7 +409,8 @@ namespace PDP_8
 
       set
       {
-        CheckTag(value, "cpu");
+        if (CheckTag(value, "cpu"))
+          return;
 
         ParamHolder ph = new ParamHolder(value.Value);
         for (int i = 0; i < ph.Count; ++i)
@@ -1160,12 +1162,14 @@ namespace PDP_8
     // *                 *
     // *******************
 
+
+
     public void Cycle()
     {
-      breakPort = null;
-
       if (cycle == CycleState.fetch)
       {
+        breakPort = null;
+
         if (brq != 0)
         {
           breakPort = BreakPorts[int.TrailingZeroCount(brq)];
@@ -1257,6 +1261,7 @@ namespace PDP_8
           if (Add12(ref mbr))
             breakPort.WCOverflow = true;
           Add12(ref mar);
+          nextState = CycleState.currentAddress;
           break;
 
         case CycleState.currentAddress:

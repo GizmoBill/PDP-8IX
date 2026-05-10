@@ -47,14 +47,24 @@ public static class PDP8
     realTimeQueue.Time = microsecs;
   }
 
-  public static void CallMeReal(string id, double microSecsFromNow)
+  public static void CallMeReal(string id, double microSecsFromNow, bool keepClosest = false)
   {
-    realTimeQueue.CallMe(id, microSecsFromNow);
+    realTimeQueue.CallMe(id, microSecsFromNow, keepClosest);
   }
 
-  public static void CallMeCycles(string id, int cyclesFromNow)
+  public static void CallMeCycles(string id, int cyclesFromNow, bool keepClosest = false)
   {
-    cycleTimeQueue.CallMe(id, cyclesFromNow);
+    cycleTimeQueue.CallMe(id, cyclesFromNow, keepClosest);
+  }
+
+  public static bool IsScleduledReal(string id)
+  {
+    return realTimeQueue.IsScheduled(id);
+  }
+
+  public static bool IsScleduledCycles(string id)
+  {
+    return cycleTimeQueue.IsScheduled(id);
   }
 
   // ************************
@@ -105,11 +115,14 @@ public static class PDP8
     return s;
   }
 
-  public static void CheckTag(XmlLiteNode node, string tag)
+  public static bool CheckTag(XmlLiteNode node, string tag)
   {
-    if (tag == null || node.Tag != tag)
+    if (node == null)
+      return true;
+    if (node.Tag != tag)
       throw new Exception(string.Format("Mismatched XML tag {0}, expected {1}",
                                         node != null ? node.Tag : "null", tag));
+    return false;
   }
 
   // ******************
@@ -206,7 +219,8 @@ public static class PDP8
     {
       try
       {
-        CheckTag(value, "PDP-8");
+        if (CheckTag(value, "PDP-8"))
+          return;
 
         Console.State = value["console"];
         Cpu.State = value["cpu"];
@@ -262,6 +276,7 @@ public static class PDP8
 
         // Non-maskable interrupts
         new DeviceConfiguration(FromOctal("74"),  4, 12),   // RK05 has its own mask
+        new DeviceConfiguration(FromOctal("76"),  5, 13)    // TC01 DECtape has its own mask
       };
 
   public static int GetChannel(int iotAddr)

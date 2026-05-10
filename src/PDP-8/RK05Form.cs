@@ -51,18 +51,19 @@ namespace PDP_8
       }
     }
 
-    // Can't load in constructor because filenames haven't yet been restored
+    // ***********
+    // *         *
+    // *  State  *
+    // *         *
+    // ***********
+
+    public const string XmlTag = "rk05";
+
     public void LoadDrives()
     {
       for (int drive = 0; drive < 4; ++drive)
       {
-        if (File.Exists(getFilename(drive)))
-        {
-          RK05.LoadDisk(drive, getFilename(drive));
-          filenameTextBoxes[drive].BackColor = Color.White;
-        }
-        else
-          filenameTextBoxes[drive].BackColor = Color.LightPink;
+        restoreDisk(drive);
         filenameTextBoxes[drive].Select(filenameTextBoxes[drive].Text.Length, 0);
       }
     }
@@ -70,9 +71,14 @@ namespace PDP_8
     public void SaveDrives()
     {
       for (int drive = 0; drive < 4; ++drive)
-        if (saveOnExitChecks[drive].Checked && saveButtons[drive].Enabled)
-          save0Button_Click(saveButtons[drive], null);
+        saveDisk(drive, false);
     }
+
+    // **********************************
+    // *                                *
+    // *  Get/Set Drives and Filenames  *
+    // *                                *
+    // **********************************
 
     public void SetChanged(int driveNum, bool changed)
     {
@@ -96,18 +102,83 @@ namespace PDP_8
       filenameTextBoxes[driveNum].Select(filename.Length, 0);
     }
 
+    // ********************************
+    // *                              *
+    // *  Load, Save, SaveAs Buttons  *
+    // *                              *
+    // ********************************
+
+    private bool saveDisk(int unitIndex, bool offer)
+    {
+      if (!RK05.GetChanged(unitIndex) || !saveOnExitChecks[unitIndex].Checked)
+        return false;
+
+      string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+      string defaultFile = string.Format("disc{0}_.rk05", unitIndex);
+      defaultFile = Path.Combine(docs, defaultFile);
+
+      string filename = getFilename(unitIndex);
+      if (filename.Length == 0)
+      {
+        if (offer)
+          switch (MessageBox.Show("Save disc?", "RK05", MessageBoxButtons.YesNoCancel))
+          {
+            case DialogResult.Yes:
+              SaveFileDialog sfd = new SaveFileDialog();
+              sfd.Filter = "RK05 File|*.rk05";
+              if (sfd.ShowDialog() == DialogResult.OK)
+                filename = sfd.FileName;
+              else
+                return true;
+              break;
+
+            case DialogResult.No:
+              return false;
+
+            case DialogResult.Cancel:
+              return true;
+          }
+        else
+          filename = defaultFile;
+      }
+      else if (File.Exists(defaultFile))
+        File.Delete(defaultFile);
+
+      RK05.SaveDisk(unitIndex, filename);
+      return false;
+    }
+
+    private void restoreDisk(int unitIndex)
+    {
+      string filename = getFilename(unitIndex);
+      if (filename.Length == 0)
+      {
+        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        filename = string.Format("disc{0}_.rk05", unitIndex);
+        filename = Path.Combine(docs, filename);
+      }
+
+      if (File.Exists(filename))
+        RK05.LoadDisk(unitIndex, filename);
+      else
+        setFilename(unitIndex, string.Empty);
+    }
+
     private void load0Button_Click(object sender, EventArgs e)
     {
+      int drive = getDriveNum(sender);
+      string filename = getFilename(drive);
+
       OpenFileDialog ofd = new OpenFileDialog();
       ofd.Filter = "RK05 File|*.rk05";
-      if (File.Exists(getFilename(getDriveNum(sender))))
-        ofd.InitialDirectory = Path.GetDirectoryName(getFilename(getDriveNum(sender)));
+      if (filename.Length > 0 && File.Exists(filename))
+        ofd.InitialDirectory = Path.GetDirectoryName(filename);
       if (ofd.ShowDialog() == DialogResult.OK)
       {
-        int drive = getDriveNum(sender);
+        if (saveDisk(drive, true))
+          return;
         RK05.LoadDisk(drive, ofd.FileName);
         setFilename(getDriveNum(sender), ofd.FileName);
-        filenameTextBoxes[drive].BackColor = Color.White;
       }
     }
 
@@ -128,7 +199,6 @@ namespace PDP_8
         int drive = getDriveNum(sender);
         RK05.SaveDisk(drive, sfd.FileName);
         setFilename(getDriveNum(sender), sfd.FileName);
-        filenameTextBoxes[drive].BackColor = Color.White;
       }
     }
   }

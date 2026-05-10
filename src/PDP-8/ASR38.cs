@@ -109,6 +109,7 @@ namespace PDP_8
         s += string.Format("first = {0};\n", firstArg);
         s += string.Format("second = {0};\n", secondArg);
         s += string.Format("escState = {0};\n", (int)escapeState);
+        s += string.Format("escMode = {0};\n", escMode);
         s += string.Format("alt = {0};\n", alt);
         s += string.Format("escChars = {0};\n", escapeChars);
         state.Children.Add(new XmlLiteNode("state", s));
@@ -118,10 +119,12 @@ namespace PDP_8
 
       set
       {
-        PDP8.CheckTag(value, XmlTag);
+        if (PDP8.CheckTag(value, XmlTag))
+          return;
 
         paperText.Text = value["paper"].Value;
         setVT100Text(value["screen"].Value);
+        paperText.Select(paperText.TextLength, 0);
 
         ParamHolder ph = new ParamHolder(value["state"].Value);
         for (int i = 0; i < ph.Count; ++i)
@@ -155,6 +158,10 @@ namespace PDP_8
               escapeState = (EscapeState)int.Parse(ph[i]);
               break;
 
+            case "escMode":
+              escMode = bool.Parse(ph[i]);
+              break;
+
             case "alt":
               alt = bool.Parse(ph[i]);
               break;
@@ -174,6 +181,8 @@ namespace PDP_8
     // *  Printer  *
     // *           *
     // *************
+
+    private bool escMode = false;    // ESC printed, ESC-3 red, ESC-4 black
 
     void setCursor(int loc = -1)
     {
@@ -199,6 +208,25 @@ namespace PDP_8
     void printOne(char c)
     {
       c = (char)(c & 0x7F);
+
+      if (escMode)
+      {
+        escMode = false;
+        switch (c)
+        {
+          case '3':
+            paperText.SelectionColor = Color.Red;
+            return;
+
+          case '4':
+            paperText.SelectionColor = Color.Black;
+            return;
+
+          default:
+            break;
+        }
+      }
+
       switch (c)
       {
         case '\a':
@@ -216,6 +244,10 @@ namespace PDP_8
 
         case '\n':
           goto default;
+
+        case esc:
+          escMode = true;
+          break;
 
         case < ' ':
           break;      // ignore other control characters
@@ -240,10 +272,10 @@ namespace PDP_8
       paperText.Focus();
     }
 
-    //private void paperText_MouseDoubleClick(object sender, MouseEventArgs e)
-    //{
-    //  paperText.SelectionColor = Color.Red;
-    //}
+    private void clearButton_Click(object sender, EventArgs e)
+    {
+      paperText.Text = string.Empty;
+    }
 
     // ***********
     // *         *
@@ -270,6 +302,7 @@ namespace PDP_8
         printer.PrintOne = vt100Print;
         savePaper = paperText.Text;
         saveASR33Size = this.Size;
+        clearButton.Visible = false;
         this.Size = new Size(1078, 1354);
         Text = "VT100";
         vt100Redraw();
@@ -279,6 +312,7 @@ namespace PDP_8
         printer.PrintOne = printOne;
         Text = "ASR-38";
         this.Size = saveASR33Size;
+        clearButton.Visible = true;
         replaceText(savePaper);
       }
 
@@ -553,12 +587,12 @@ namespace PDP_8
 
         case 'H':
           xCursor = Math.Min(Math.Max(secondArg, 1), screenWd) - 1;
-          yCursor = Math.Min(Math.Max(firstArg , 1), screenHt) - 1;
+          yCursor = Math.Min(Math.Max(firstArg, 1), screenHt) - 1;
           vt100Redraw();
           break;
 
         case 'r':
-          scrollWindowTop    = Math.Min(Math.Max(firstArg , 1), screenHt) - 1;
+          scrollWindowTop = Math.Min(Math.Max(firstArg, 1), screenHt) - 1;
           scrollWindowBottom = Math.Min(Math.Max(secondArg, 1), screenHt) - 1;
           break;
       }

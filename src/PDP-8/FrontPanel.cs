@@ -24,6 +24,7 @@ namespace PDP_8
       InitializeComponent();
 
       aspect = (float)ClientSize.Width / ClientSize.Height;
+      currentSize = ClientSize;
 
       initLights();
       initSwitches();
@@ -160,6 +161,17 @@ namespace PDP_8
 
     public void SetLights()
     {
+      // Deduce Pause count (onCounts[87]) from IOT count (onCounts[78]) and adjust
+      // opcode lights (onCounts[72 - 79]. IOT cycles are 4.25 us. Guess that the
+      // Pause state lasts 4.25 - 1.5 = 2.75 us = 1.83 cycles. Only need to adjust
+      // the opcode lights because they are mutually exclusive.
+      float pauseCycles = 1.833f * onCounts[78];
+      float pauseCorrection = (float)onCycles / (onCycles + pauseCycles);
+      for (int i = 72; i <= 79; ++i)
+        if (i != 78)
+          onCounts[i] = (int)Math.Round(onCounts[i] * pauseCorrection);
+      onCounts[87] = (int)Math.Round(pauseCycles * pauseCorrection);
+
       const int z0 = 96;
       for (int i = 0; i < onCounts.Length; ++i)
       {
@@ -332,6 +344,10 @@ namespace PDP_8
       }
     }
 
+    public bool SingleStep { get { return switches[24].On == 1; } }
+
+    public bool SingleInstr { get { return switches[25].On == 1; } }
+
     float touchZone = 0.4f;   // fraction of switch that is active to touch
 
     bool swiping = false;
@@ -351,7 +367,7 @@ namespace PDP_8
       foreach (Switch sw in switches)
         if (sw.swType == SwitchType.Toggle)
         {
-          int x =  screenX - sw.sw0.Left;
+          int x = screenX - sw.sw0.Left;
           if (0.2f * sw.sw0.Width <= x && x <= 0.8f * sw.sw0.Width)
           {
             int on = sw.On;
@@ -406,12 +422,7 @@ namespace PDP_8
           break;
 
         case SwitchType.Continue:
-          if (switches[24].On == 1)
-            PDP8.Console.stepButton.PerformClick();
-          else if (switches[25].On == 1)
-            PDP8.Console.instrButton.PerformClick();
-          else
-            PDP8.Console.continueButton.PerformClick();
+          PDP8.Console.continueButton.PerformClick();
           break;
 
         case SwitchType.Stop:
@@ -448,31 +459,28 @@ namespace PDP_8
       }
     }
 
-    bool adjusting = false;
+    bool adjusting = true;  // set false on form shown to avoid Win10 issue
+    Size currentSize;
 
     private void FrontPanel_Resize(object sender, EventArgs e)
     {
       // Keep aspect ratio
       // Prevent recursive resize loops
-      if (adjusting) return;
+      if (adjusting)
+        return;
       adjusting = true;
 
       int w = ClientSize.Width;
       int h = ClientSize.Height;
 
       // Decide which dimension the user is dragging more
-      if (w / (float)h > aspect)
-      {
-        // Too wide → adjust width from height
-        w = (int)(h * aspect);
-      }
-      else
-      {
-        // Too tall → adjust height from width
+      if (w != currentSize.Width)
         h = (int)(w / aspect);
-      }
+      else if (h != currentSize.Height)
+        w = (int)(h * aspect);
 
       ClientSize = new Size(w, h);
+      currentSize = ClientSize;
       adjusting = false;
 
       // Move and resize lights
@@ -491,6 +499,12 @@ namespace PDP_8
         sw.sw1.SetBounds((int)(w * sw.left), (int)(h * sw.top),
                          (int)(w * sw.width), (int)(h * sw.height));
       }
+    }
+
+    private void FrontPanel_Shown(object sender, EventArgs e)
+    {
+      adjusting = false;
+      FrontPanel_Resize(sender, e);
     }
   }
 }

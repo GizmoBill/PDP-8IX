@@ -37,6 +37,7 @@
       label3 = new Label();
       printSpeedNumeric = new NumericUpDown();
       statusPanel = new Panel();
+      clearButton = new Button();
       vt100Check = new CheckBox();
       paperText = new TeletypeRichTextBox();
       ((System.ComponentModel.ISupportInitialize)printSpeedNumeric).BeginInit();
@@ -135,6 +136,7 @@
       // statusPanel
       // 
       statusPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+      statusPanel.Controls.Add(clearButton);
       statusPanel.Controls.Add(vt100Check);
       statusPanel.Controls.Add(label3);
       statusPanel.Controls.Add(printSpeedNumeric);
@@ -148,6 +150,17 @@
       statusPanel.Name = "statusPanel";
       statusPanel.Size = new Size(1154, 77);
       statusPanel.TabIndex = 6;
+      // 
+      // clearButton
+      // 
+      clearButton.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0);
+      clearButton.Location = new Point(561, 21);
+      clearButton.Name = "clearButton";
+      clearButton.Size = new Size(85, 37);
+      clearButton.TabIndex = 7;
+      clearButton.Text = "Clear";
+      clearButton.UseVisualStyleBackColor = true;
+      clearButton.Click += clearButton_Click;
       // 
       // vt100Check
       // 
@@ -210,5 +223,6 @@
     private Panel statusPanel;
     private TeletypeRichTextBox paperText;
     private CheckBox vt100Check;
+    private Button clearButton;
   }
 }

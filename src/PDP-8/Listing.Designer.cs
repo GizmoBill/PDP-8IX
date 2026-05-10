@@ -34,6 +34,7 @@
       // listingText
       // 
       listingText.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+      listingText.Font = new Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
       listingText.HideSelection = false;
       listingText.Location = new Point(0, 0);
       listingText.Multiline = true;

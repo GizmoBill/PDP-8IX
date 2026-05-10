@@ -6,6 +6,7 @@ using System.Data;
 using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -21,16 +22,20 @@ namespace PDP_8
     AF01A a2d;
     Integrator integ;
 
-    public HRPForm()
+    const string actionId = "hrpAction";
+
+    public HRPForm(PPIForm ppi)
     {
       InitializeComponent();
 
-      hrp = new HRP(this);
+      hrp = new HRP(this, ppi);
       a2d = new AF01A(this);
       integ = new Integrator(this);
 
       spyCombo.SelectedIndex = 0;
       esrCombo.SelectedIndex = 0;
+
+      RegisterAction(actionId, wakeup);
     }
 
     private void HRPForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -117,6 +122,100 @@ namespace PDP_8
 
     public int El73 { get { return toBCD(wr73ElNumeric.Value); } }
 
+    float azv66, elv66;
+    float azv73;
+
+    const double actionPeriod = 40000;
+
+    public void SetVel66(float azv, float elv)
+    {
+      if (!scan66Check.Checked)
+      {
+        azv66 = azv;
+        wr66AzVelLabel.Text = azv.ToString("f2");
+      }
+
+      elv -= 128;
+      if (elv < 0)
+        elv += 16;
+      else if (elv > 0)
+        elv -= 24;
+      elv /= 64;
+
+      wr66ElVelLabel.Text = elv.ToString("f2");
+      elv66 = elv;
+
+      CallMeReal(actionId, actionPeriod, true);
+    }
+
+    public void SetAzVel73(float azv)
+    {
+      if (!scan73Check.Checked)
+      {
+        azv73 = azv;
+        wr73AzVelLabel.Text = azv.ToString("f2");
+        CallMeReal(actionId, actionPeriod, true);
+      }
+    }
+
+    public void SetEl73(float el)
+    {
+      wr73ElSetLabel.Text = el.ToString("f1");
+      if (autoEl73Check.Checked)
+        try
+        {
+          wr73ElNumeric.Value = (decimal)el;
+        }
+        catch (ArgumentOutOfRangeException)
+        { }
+    }
+
+    private void scan66Check_CheckedChanged(object sender, EventArgs e)
+    {
+      azv66 = scan66Check.Checked ? 1 : 0;
+      wr66AzVelLabel.Text = azv66.ToString("f2");
+    }
+
+    private void scan73Check_CheckedChanged(object sender, EventArgs e)
+    {
+      azv73 = scan73Check.Checked ? 1 : 0;
+      wr73AzVelLabel.Text = azv73.ToString("f2");
+    }
+
+    void wakeup()
+    {
+      // vel in deg/integration period (RADAR uses -1, 0, or +1)
+      if (azv66 != 0)
+      {
+        // deg/period * usec / usec/period = deg
+        // make it a little less so scanning doesn't miss a ray
+        double dAz = 0.75 * (azv66 * actionPeriod / integ.IntegrationPeriod);
+        double newAz = MathUtil.mod((double)wr66AzNumeric.Value + dAz, 360.0);
+        wr66AzNumeric.Value = (decimal)newAz;
+      }
+
+      if (azv73 != 0)
+      {
+        double dAz = 0.75 * (azv73 * actionPeriod / integ.IntegrationPeriod);
+        double newAz = MathUtil.mod((double)wr73AzNumeric.Value + dAz, 360.0);
+        wr73AzNumeric.Value = (decimal)newAz;
+      }
+
+      if (elv66 != 0 && autoEl66Check.Checked)
+      {
+        double dEl = 4.0 * elv66 * actionPeriod * 1.0e-6;
+        try
+        {
+          wr66ElNumeric.Value += (decimal)dEl;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+        }
+      }
+
+      CallMeReal(actionId, actionPeriod);
+    }
+
 
     // ******************************
     // *                            *
@@ -156,6 +255,8 @@ namespace PDP_8
           esr1 |= 0x010;
         if (runCheck.Checked)
           esr1 |= 0x004;
+        if (ppiCheck.Checked)
+          esr1 |= 0x008;
 
         zeroClicked = false;
         nextClicked = false;
@@ -189,6 +290,5 @@ namespace PDP_8
           return 0;
       }
     }
-
   }
 }

@@ -44,12 +44,11 @@
       splitListingToolStripMenuItem = new ToolStripMenuItem();
       writeBinaryToolStripMenuItem = new ToolStripMenuItem();
       writeSourceToolStripMenuItem = new ToolStripMenuItem();
-      toolStripSeparator2 = new ToolStripSeparator();
-      coreDumpToolStripMenuItem = new ToolStripMenuItem();
       devicesToolStripMenuItem = new ToolStripMenuItem();
       tty1ConsoleToolStripMenuItem = new ToolStripMenuItem();
       tTY2ToolStripMenuItem = new ToolStripMenuItem();
       rK05ToolStripMenuItem = new ToolStripMenuItem();
+      dECtapeToolStripMenuItem = new ToolStripMenuItem();
       hRPToolStripMenuItem = new ToolStripMenuItem();
       tektronix611ToolStripMenuItem = new ToolStripMenuItem();
       optionsToolStripMenuItem = new ToolStripMenuItem();
@@ -105,6 +104,7 @@
       label2 = new Label();
       label1 = new Label();
       runTimer = new System.Windows.Forms.Timer(components);
+      pPIToolStripMenuItem = new ToolStripMenuItem();
       menuStrip1.SuspendLayout();
       panel1.SuspendLayout();
       SuspendLayout();
@@ -122,106 +122,95 @@
       // 
       // fileToolStripMenuItem
       // 
-      fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newToolStripMenuItem, openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, toolStripSeparator3, oS8ToolStripMenuItem, toolStripSeparator1, loadListingToolStripMenuItem, readListingToolStripMenuItem, splitListingToolStripMenuItem, writeBinaryToolStripMenuItem, writeSourceToolStripMenuItem, toolStripSeparator2, coreDumpToolStripMenuItem });
+      fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newToolStripMenuItem, openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, toolStripSeparator3, oS8ToolStripMenuItem, toolStripSeparator1, loadListingToolStripMenuItem, readListingToolStripMenuItem, splitListingToolStripMenuItem, writeBinaryToolStripMenuItem, writeSourceToolStripMenuItem });
       fileToolStripMenuItem.Name = "fileToolStripMenuItem";
       fileToolStripMenuItem.Size = new Size(54, 29);
       fileToolStripMenuItem.Text = "File";
+      fileToolStripMenuItem.DropDownOpening += fileToolStripMenuItem_DropDownOpening;
       // 
       // newToolStripMenuItem
       // 
       newToolStripMenuItem.Name = "newToolStripMenuItem";
-      newToolStripMenuItem.Size = new Size(270, 34);
+      newToolStripMenuItem.Size = new Size(221, 34);
       newToolStripMenuItem.Text = "New";
       newToolStripMenuItem.Click += newToolStripMenuItem_Click;
       // 
       // openToolStripMenuItem
       // 
       openToolStripMenuItem.Name = "openToolStripMenuItem";
-      openToolStripMenuItem.Size = new Size(270, 34);
+      openToolStripMenuItem.Size = new Size(221, 34);
       openToolStripMenuItem.Text = "Open...";
       openToolStripMenuItem.Click += openToolStripMenuItem_Click;
       // 
       // saveToolStripMenuItem
       // 
       saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-      saveToolStripMenuItem.Size = new Size(270, 34);
+      saveToolStripMenuItem.Size = new Size(221, 34);
       saveToolStripMenuItem.Text = "Save";
       saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
       // 
       // saveAsToolStripMenuItem
       // 
       saveAsToolStripMenuItem.Name = "saveAsToolStripMenuItem";
-      saveAsToolStripMenuItem.Size = new Size(270, 34);
+      saveAsToolStripMenuItem.Size = new Size(221, 34);
       saveAsToolStripMenuItem.Text = "SaveAs...";
       saveAsToolStripMenuItem.Click += saveAsToolStripMenuItem_Click;
       // 
       // toolStripSeparator3
       // 
       toolStripSeparator3.Name = "toolStripSeparator3";
-      toolStripSeparator3.Size = new Size(267, 6);
+      toolStripSeparator3.Size = new Size(218, 6);
       // 
       // oS8ToolStripMenuItem
       // 
       oS8ToolStripMenuItem.Name = "oS8ToolStripMenuItem";
-      oS8ToolStripMenuItem.Size = new Size(270, 34);
+      oS8ToolStripMenuItem.Size = new Size(221, 34);
       oS8ToolStripMenuItem.Text = "OS-8";
       oS8ToolStripMenuItem.Click += oS8ToolStripMenuItem_Click;
       // 
       // toolStripSeparator1
       // 
       toolStripSeparator1.Name = "toolStripSeparator1";
-      toolStripSeparator1.Size = new Size(267, 6);
+      toolStripSeparator1.Size = new Size(218, 6);
       // 
       // loadListingToolStripMenuItem
       // 
       loadListingToolStripMenuItem.Name = "loadListingToolStripMenuItem";
-      loadListingToolStripMenuItem.Size = new Size(270, 34);
+      loadListingToolStripMenuItem.Size = new Size(221, 34);
       loadListingToolStripMenuItem.Text = "Load Listing...";
       loadListingToolStripMenuItem.Click += loadListingToolStripMenuItem_Click;
       // 
       // readListingToolStripMenuItem
       // 
       readListingToolStripMenuItem.Name = "readListingToolStripMenuItem";
-      readListingToolStripMenuItem.Size = new Size(270, 34);
+      readListingToolStripMenuItem.Size = new Size(221, 34);
       readListingToolStripMenuItem.Text = "Read Listing...";
       readListingToolStripMenuItem.Click += readListingToolStripMenuItem_Click;
       // 
       // splitListingToolStripMenuItem
       // 
       splitListingToolStripMenuItem.Name = "splitListingToolStripMenuItem";
-      splitListingToolStripMenuItem.Size = new Size(270, 34);
+      splitListingToolStripMenuItem.Size = new Size(221, 34);
       splitListingToolStripMenuItem.Text = "Split Listing...";
       splitListingToolStripMenuItem.Click += splitListingToolStripMenuItem_Click;
       // 
       // writeBinaryToolStripMenuItem
       // 
       writeBinaryToolStripMenuItem.Name = "writeBinaryToolStripMenuItem";
-      writeBinaryToolStripMenuItem.Size = new Size(270, 34);
+      writeBinaryToolStripMenuItem.Size = new Size(221, 34);
       writeBinaryToolStripMenuItem.Text = "Write Binary";
       writeBinaryToolStripMenuItem.Click += writeBinaryToolStripMenuItem_Click;
       // 
       // writeSourceToolStripMenuItem
       // 
       writeSourceToolStripMenuItem.Name = "writeSourceToolStripMenuItem";
-      writeSourceToolStripMenuItem.Size = new Size(270, 34);
+      writeSourceToolStripMenuItem.Size = new Size(221, 34);
       writeSourceToolStripMenuItem.Text = "Write Source";
       writeSourceToolStripMenuItem.Click += writeSourceToolStripMenuItem_Click;
       // 
-      // toolStripSeparator2
-      // 
-      toolStripSeparator2.Name = "toolStripSeparator2";
-      toolStripSeparator2.Size = new Size(267, 6);
-      // 
-      // coreDumpToolStripMenuItem
-      // 
-      coreDumpToolStripMenuItem.Name = "coreDumpToolStripMenuItem";
-      coreDumpToolStripMenuItem.Size = new Size(270, 34);
-      coreDumpToolStripMenuItem.Text = "Core Dump";
-      coreDumpToolStripMenuItem.Click += coreDumpToolStripMenuItem_Click;
-      // 
       // devicesToolStripMenuItem
       // 
-      devicesToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { tty1ConsoleToolStripMenuItem, tTY2ToolStripMenuItem, rK05ToolStripMenuItem, hRPToolStripMenuItem, tektronix611ToolStripMenuItem });
+      devicesToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { tty1ConsoleToolStripMenuItem, tTY2ToolStripMenuItem, rK05ToolStripMenuItem, dECtapeToolStripMenuItem, hRPToolStripMenuItem, tektronix611ToolStripMenuItem, pPIToolStripMenuItem });
       devicesToolStripMenuItem.Name = "devicesToolStripMenuItem";
       devicesToolStripMenuItem.Size = new Size(88, 29);
       devicesToolStripMenuItem.Text = "Devices";
@@ -229,35 +218,42 @@
       // tty1ConsoleToolStripMenuItem
       // 
       tty1ConsoleToolStripMenuItem.Name = "tty1ConsoleToolStripMenuItem";
-      tty1ConsoleToolStripMenuItem.Size = new Size(219, 34);
+      tty1ConsoleToolStripMenuItem.Size = new Size(270, 34);
       tty1ConsoleToolStripMenuItem.Text = "TTY1";
       tty1ConsoleToolStripMenuItem.Click += aSR38ConsoleToolStripMenuItem_Click;
       // 
       // tTY2ToolStripMenuItem
       // 
       tTY2ToolStripMenuItem.Name = "tTY2ToolStripMenuItem";
-      tTY2ToolStripMenuItem.Size = new Size(219, 34);
+      tTY2ToolStripMenuItem.Size = new Size(270, 34);
       tTY2ToolStripMenuItem.Text = "TTY2";
       tTY2ToolStripMenuItem.Click += tTY2ToolStripMenuItem_Click;
       // 
       // rK05ToolStripMenuItem
       // 
       rK05ToolStripMenuItem.Name = "rK05ToolStripMenuItem";
-      rK05ToolStripMenuItem.Size = new Size(219, 34);
+      rK05ToolStripMenuItem.Size = new Size(270, 34);
       rK05ToolStripMenuItem.Text = "RK05";
       rK05ToolStripMenuItem.Click += rK05ToolStripMenuItem_Click;
+      // 
+      // dECtapeToolStripMenuItem
+      // 
+      dECtapeToolStripMenuItem.Name = "dECtapeToolStripMenuItem";
+      dECtapeToolStripMenuItem.Size = new Size(270, 34);
+      dECtapeToolStripMenuItem.Text = "DECtape";
+      dECtapeToolStripMenuItem.Click += dECtapeToolStripMenuItem_Click;
       // 
       // hRPToolStripMenuItem
       // 
       hRPToolStripMenuItem.Name = "hRPToolStripMenuItem";
-      hRPToolStripMenuItem.Size = new Size(219, 34);
+      hRPToolStripMenuItem.Size = new Size(270, 34);
       hRPToolStripMenuItem.Text = "HRP";
       hRPToolStripMenuItem.Click += hRPToolStripMenuItem_Click;
       // 
       // tektronix611ToolStripMenuItem
       // 
       tektronix611ToolStripMenuItem.Name = "tektronix611ToolStripMenuItem";
-      tektronix611ToolStripMenuItem.Size = new Size(219, 34);
+      tektronix611ToolStripMenuItem.Size = new Size(270, 34);
       tektronix611ToolStripMenuItem.Text = "Tektronix 611";
       tektronix611ToolStripMenuItem.Click += tektronix611ToolStripMenuItem_Click;
       // 
@@ -834,6 +830,13 @@
       runTimer.Interval = 3;
       runTimer.Tick += runTimer_Tick;
       // 
+      // pPIToolStripMenuItem
+      // 
+      pPIToolStripMenuItem.Name = "pPIToolStripMenuItem";
+      pPIToolStripMenuItem.Size = new Size(270, 34);
+      pPIToolStripMenuItem.Text = "PPI";
+      pPIToolStripMenuItem.Click += pPIToolStripMenuItem_Click;
+      // 
       // ConsoleForm
       // 
       AutoScaleDimensions = new SizeF(144F, 144F);
@@ -889,7 +892,6 @@
     private ToolStripMenuItem x10ToolStripMenuItem;
     private ToolStripMenuItem oS8ToolStripMenuItem;
     private Label disasmLabel;
-    private ToolStripMenuItem coreDumpToolStripMenuItem;
     private ToolStripMenuItem tTY2ToolStripMenuItem;
     private ToolStripMenuItem rK05ToolStripMenuItem;
     private Label label6;
@@ -897,7 +899,6 @@
     private Label xModeLabel;
     private ToolStripSeparator toolStripSeparator1;
     private ToolStripMenuItem splitListingToolStripMenuItem;
-    private ToolStripSeparator toolStripSeparator2;
     private ToolStripMenuItem writeBinaryToolStripMenuItem;
     private ToolStripMenuItem writeSourceToolStripMenuItem;
     private Label instrLabel;
@@ -938,5 +939,7 @@
     private ToolStripMenuItem tektronix611ToolStripMenuItem;
     private ToolStripMenuItem recordOnlyBreaksToolStripMenuItem;
     private ToolStripMenuItem readListingToolStripMenuItem;
+    private ToolStripMenuItem dECtapeToolStripMenuItem;
+    private ToolStripMenuItem pPIToolStripMenuItem;
   }
 }

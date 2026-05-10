@@ -151,10 +151,12 @@
       Font = new Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
       Margin = new Padding(4);
       MaximizeBox = false;
+      MinimumSize = new Size(500, 250);
       Name = "FrontPanel";
       StartPosition = FormStartPosition.Manual;
       Text = "FrontPanel";
       FormClosing += FrontPanel_FormClosing;
+      Shown += FrontPanel_Shown;
       Resize += FrontPanel_Resize;
       ((System.ComponentModel.ISupportInitialize)white0Picture).EndInit();
       ((System.ComponentModel.ISupportInitialize)white1Picture).EndInit();
