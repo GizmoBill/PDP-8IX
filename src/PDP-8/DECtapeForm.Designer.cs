@@ -138,7 +138,6 @@
       unitNumeric0.Name = "unitNumeric0";
       unitNumeric0.Size = new Size(54, 39);
       unitNumeric0.TabIndex = 6;
-      unitNumeric0.Tag = "unit0";
       unitNumeric0.TextAlign = HorizontalAlignment.Right;
       unitNumeric0.Value = new decimal(new int[] { 1, 0, 0, 0 });
       unitNumeric0.ValueChanged += unit0Numeric_ValueChanged;
@@ -193,7 +192,6 @@
       unitNumeric1.Name = "unitNumeric1";
       unitNumeric1.Size = new Size(54, 39);
       unitNumeric1.TabIndex = 6;
-      unitNumeric1.Tag = "unit1";
       unitNumeric1.TextAlign = HorizontalAlignment.Right;
       unitNumeric1.Value = new decimal(new int[] { 2, 0, 0, 0 });
       unitNumeric1.ValueChanged += unit0Numeric_ValueChanged;

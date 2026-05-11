@@ -27,7 +27,6 @@ namespace PDP_8
     int binCounter;   // counts bins [0 .. 100]
     int binRes;       // half-nmi per bin
     int mapIndex;     // index into binMap[azimuth]
-    int lastAz;       // for automatic erasing during scans
 
     // 1D array for faster access with compiled binMap data. Each byte is 1 kn x 1 km.
     byte[] dbzMap = new byte[ImageDimension * ImageDimension];
@@ -41,9 +40,10 @@ namespace PDP_8
     // Range ring indices. 5 50 km rings at each azimuth
     List<int>[] rangeRings = new List<int>[360];
 
-    // Keep track of plotted rays for auto-erase.
-    // 0 ray is blank; 1 range rings only; 2 not blank
-    byte[] liveRays = new byte[360];
+    // Screen fade in non-color mode. dbzMap values persist for maxLife update
+    // cycles, then fade to black.
+    byte[] lifeTime = new byte[ImageDimension * ImageDimension];
+    const byte maxLife = 80;
 
     // Ray format used by RADAR
     enum RayPhase
@@ -156,7 +156,7 @@ namespace PDP_8
       else
         for (int i = 0; i < 256; i++)
         {
-          int z = Math.Min((int)Math.Round(i / 60.0 * 255.0), 255);
+          int z = Math.Min((int)Math.Round(i / 63.0 * 255.0), 255);
           pal.Entries[i] = Color.FromArgb(z, z, z);
         }
 
@@ -165,6 +165,12 @@ namespace PDP_8
 
     public void Ray(int w)
     {
+      // 0xAAA is beginning of ray sync word. Only azimuth, a binary angle, can take
+      // on that value. If seen in any other phase, resync. Loss of sync might be
+      // caused by ray transmission being aborted. 
+      if (rayPhase != RayPhase.Azimuth && w == 0xAAA)
+        rayPhase = RayPhase.Idle;
+
       switch (rayPhase)
       {
         case RayPhase.Idle:
@@ -200,7 +206,6 @@ namespace PDP_8
                 break;
             }
 
-          liveRays[azimuth] = 0;
           rayPhase = RayPhase.Bin;
           break;
 
@@ -213,7 +218,7 @@ namespace PDP_8
               {
                 int index = binMap[azimuth][mapIndex++];
                 dbzMap[index] = (byte)w;
-                liveRays[azimuth] |= (byte)w;
+                lifeTime[index] = maxLife;
               }
             else
             {
@@ -224,19 +229,13 @@ namespace PDP_8
 
           if (++binCounter == 100)
           {
+            byte z = (byte)(colorMode ? 255 : 64);
             foreach (int index in rangeRings[azimuth])
-              dbzMap[index] = 255;
+            {
+              dbzMap[index] = z;
+              lifeTime[index] = maxLife;
+            }
 
-            int dAz = azimuth - lastAz;
-            if (Math.Abs(dAz) == 1)
-              for (int i = 1; i <= 30; ++i)
-              {
-                int az = MathUtil.mod(azimuth + dAz * i, 360);
-                eraseRay(az);
-              }
-
-            liveRays[azimuth] = (byte)(liveRays[azimuth] == 0 ? 1 : 2);
-            lastAz = azimuth;
             screenChanged = true;
 
             rayPhase = RayPhase.Idle;
@@ -246,41 +245,9 @@ namespace PDP_8
       }
     }
 
-    void eraseRay(int az)
-    {
-      switch (liveRays[az])
-      {
-        case 0:
-          break;
-
-        case 1:
-          foreach (int index in rangeRings[az])
-            dbzMap[index] = 0;
-          screenChanged = true;
-          break;
-
-        case 2:
-          List<int> ray = binMap[az];
-          for (int i = 0; ray[i] >= 0;)
-          {
-            int count = ray[i++];
-            while (count > 0)
-            {
-              dbzMap[ray[i++]] = 0;
-              --count;
-            }
-          }
-          screenChanged = true;
-          break;
-      }
-
-      liveRays[az] = 0;
-    }
-
     void erase()
     {
       Array.Clear(dbzMap);
-      Array.Clear(liveRays);
       screenChanged = true;
     }
 
@@ -293,6 +260,7 @@ namespace PDP_8
       {
         int stride = data.Stride;
         IntPtr scan0 = data.Scan0;
+        screenChanged = false;
 
         unsafe
         {
@@ -300,8 +268,21 @@ namespace PDP_8
           for (int y = 0; y < bmp.Height; ++y)
           {
             byte* row = (byte*)scan0 + (y * stride);
-            for (int x = 0; x < ImageDimension; ++x)
-              row[x] = dbzMap[p++];
+
+            if (colorMode)
+              for (int x = 0; x < ImageDimension; ++x)
+                row[x] = dbzMap[p++];
+            else
+              for (int x = 0; x < ImageDimension; ++x, ++p)
+                if ((row[x] = dbzMap[p]) > 0)
+                {
+                  if (lifeTime[p] > 0)
+                    --lifeTime[p];
+                  else
+                    --dbzMap[p];
+
+                  screenChanged = true;
+                }
           }
         }
       }
@@ -310,7 +291,6 @@ namespace PDP_8
         bmp.UnlockBits(data);
       }
 
-      screenChanged = false;
       Invalidate();
     }
 
@@ -333,8 +313,8 @@ namespace PDP_8
 
     private void colorCheck_CheckedChanged(object sender, EventArgs e)
     {
+      erase();
       setPalette();
-      Invalidate();
     }
 
     private void eraseButton_Click(object sender, EventArgs e)

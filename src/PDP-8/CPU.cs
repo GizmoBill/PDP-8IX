@@ -1092,8 +1092,8 @@ namespace PDP_8
             ac |= sfr;
             break;
           case 4:
-            ibr = sfr & 7;
-            cdf = sfr >> 3;
+            cdf = sfr & 7;
+            ibr = sfr >> 3;
             break;
           default:
             IllegalInstr();

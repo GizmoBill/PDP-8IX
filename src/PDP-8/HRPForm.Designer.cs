@@ -30,6 +30,7 @@
     {
       sevenSegLabel = new Label();
       groupBox1 = new GroupBox();
+      autoEl66Check = new CheckBox();
       scan66Check = new CheckBox();
       wr66ElNumeric = new NumericUpDown();
       wr66AzNumeric = new NumericUpDown();
@@ -38,6 +39,7 @@
       wr66AzVelLabel = new Label();
       wr66ElVelLabel = new Label();
       groupBox2 = new GroupBox();
+      autoEl73Check = new CheckBox();
       scan73Check = new CheckBox();
       wr73ElNumeric = new NumericUpDown();
       wr73AzNumeric = new NumericUpDown();
@@ -70,8 +72,6 @@
       panel1 = new Panel();
       aToD1Track = new TrackBar();
       aToD2Track = new TrackBar();
-      autoEl66Check = new CheckBox();
-      autoEl73Check = new CheckBox();
       groupBox1.SuspendLayout();
       ((System.ComponentModel.ISupportInitialize)wr66ElNumeric).BeginInit();
       ((System.ComponentModel.ISupportInitialize)wr66AzNumeric).BeginInit();
@@ -117,6 +117,18 @@
       groupBox1.TabStop = false;
       groupBox1.Text = "WR66";
       // 
+      // autoEl66Check
+      // 
+      autoEl66Check.AutoSize = true;
+      autoEl66Check.Location = new Point(108, 128);
+      autoEl66Check.Name = "autoEl66Check";
+      autoEl66Check.Size = new Size(111, 32);
+      autoEl66Check.TabIndex = 13;
+      autoEl66Check.Tag = "autoEl66";
+      autoEl66Check.Text = "Auto EL";
+      autoEl66Check.UseVisualStyleBackColor = true;
+      autoEl66Check.CheckedChanged += scan66Check_CheckedChanged;
+      // 
       // scan66Check
       // 
       scan66Check.AutoSize = true;
@@ -124,6 +136,7 @@
       scan66Check.Name = "scan66Check";
       scan66Check.Size = new Size(82, 32);
       scan66Check.TabIndex = 13;
+      scan66Check.Tag = "scan66";
       scan66Check.Text = "Scan";
       scan66Check.UseVisualStyleBackColor = true;
       scan66Check.CheckedChanged += scan66Check_CheckedChanged;
@@ -211,6 +224,17 @@
       groupBox2.TabStop = false;
       groupBox2.Text = "WR73";
       // 
+      // autoEl73Check
+      // 
+      autoEl73Check.AutoSize = true;
+      autoEl73Check.Location = new Point(108, 128);
+      autoEl73Check.Name = "autoEl73Check";
+      autoEl73Check.Size = new Size(111, 32);
+      autoEl73Check.TabIndex = 15;
+      autoEl73Check.Tag = "autoEl73";
+      autoEl73Check.Text = "Auto EL";
+      autoEl73Check.UseVisualStyleBackColor = true;
+      // 
       // scan73Check
       // 
       scan73Check.AutoSize = true;
@@ -218,6 +242,7 @@
       scan73Check.Name = "scan73Check";
       scan73Check.Size = new Size(82, 32);
       scan73Check.TabIndex = 14;
+      scan73Check.Tag = "scan73";
       scan73Check.Text = "Scan";
       scan73Check.UseVisualStyleBackColor = true;
       scan73Check.CheckedChanged += scan73Check_CheckedChanged;
@@ -401,6 +426,7 @@
       runCheck.Name = "runCheck";
       runCheck.Size = new Size(75, 32);
       runCheck.TabIndex = 19;
+      runCheck.Tag = "run";
       runCheck.Text = "Run";
       runCheck.UseVisualStyleBackColor = true;
       // 
@@ -520,6 +546,7 @@
       ppiCheck.Name = "ppiCheck";
       ppiCheck.Size = new Size(137, 32);
       ppiCheck.TabIndex = 19;
+      ppiCheck.Tag = "ppi";
       ppiCheck.Text = "Enable PPI";
       ppiCheck.UseVisualStyleBackColor = true;
       // 
@@ -571,27 +598,6 @@
       aToD2Track.TabIndex = 25;
       aToD2Track.TickStyle = TickStyle.TopLeft;
       aToD2Track.Value = 2048;
-      // 
-      // autoEl66Check
-      // 
-      autoEl66Check.AutoSize = true;
-      autoEl66Check.Location = new Point(108, 128);
-      autoEl66Check.Name = "autoEl66Check";
-      autoEl66Check.Size = new Size(111, 32);
-      autoEl66Check.TabIndex = 13;
-      autoEl66Check.Text = "Auto EL";
-      autoEl66Check.UseVisualStyleBackColor = true;
-      autoEl66Check.CheckedChanged += scan66Check_CheckedChanged;
-      // 
-      // autoEl73Check
-      // 
-      autoEl73Check.AutoSize = true;
-      autoEl73Check.Location = new Point(108, 128);
-      autoEl73Check.Name = "autoEl73Check";
-      autoEl73Check.Size = new Size(111, 32);
-      autoEl73Check.TabIndex = 15;
-      autoEl73Check.Text = "Auto EL";
-      autoEl73Check.UseVisualStyleBackColor = true;
       // 
       // HRPForm
       // 

@@ -166,10 +166,15 @@ public class ClockQueue
       if (CheckTag(value, xmlTag))
         return;
 
+      queue.Clear();
       ParamHolder ph = new ParamHolder(value.Value);
       time = double.Parse(ph[0]);
       for (int i = 1; i < ph.Count; ++i)
-        queue.Add((double.Parse(ph[i]), ph.Name(i)));
+      {
+        double t = double.Parse(ph[i]);
+        if (t >= time)    // fix bug in previously saved queues
+          queue.Add((t, ph.Name(i)));
+      }
     }
   }
 
@@ -377,7 +382,14 @@ public class PriorityInterrupt : IODevice
 
   // 1 means interrupt channel masked off. Public set for IOFlag.FullState
   int mask = 0;
-  public int Mask { get { return mask; } set { setMask(value); } }
+  public int Mask
+  {
+    get { return mask; }
+    set
+    {
+      setMask(value);
+    }
+  }
 
   public PriorityInterrupt()
   {

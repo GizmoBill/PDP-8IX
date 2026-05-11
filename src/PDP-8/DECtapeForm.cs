@@ -19,11 +19,13 @@ namespace PDP_8
   {
     const int InstalledDrives = 2;
 
-    // unitNum [0 .. 7] is selected by the numericUpDown, bits 0-2 of
-    // status register A. unitIndex [0 .. 1] is which physical drive.
-    // driveMap maps unitNum to unitIndex, or -1 if no drive selects
-    // that unitNum.
-    int[] driveMap = new int[8];
+    // unitNum [0 .. 7] is selected by the NumericUpDown controls, and is bits
+    // 0-2 of status register A. unitIndex [0 .. InstalledDrives) is which
+    // physical drive. driveSelect maps unitIndex to unitNum. It mirrors the
+    // values in the NumericUpDown controls, and is used to prevent conflicts
+    // when the user changes the values.
+    int[] driveSelect = new int[InstalledDrives];
+    NumericUpDown[] driveControls;
 
     // The two installed physical drives
     DecTapeDriveControl[] drives;
@@ -40,14 +42,13 @@ namespace PDP_8
     {
       InitializeComponent();
 
-      for (int i = 0; i < driveMap.Length; ++i)
-        driveMap[i] = -1;
-      driveMap[(int)unitNumeric0.Value] = 0;
-      driveMap[(int)unitNumeric1.Value] = 1;
-
       drives = new DecTapeDriveControl[] { dectape0, dectape1 };
       saveButtons = new Button[] { saveButton0, saveButton1 };
       unloadButtons = new Button[] { unloadButton0, unloadButton1 };
+      driveControls = new NumericUpDown[] { unitNumeric0, unitNumeric1 };
+
+      for (int i = 0; i < InstalledDrives; ++i)
+        driveSelect[i] = (int)driveControls[i].Value;
 
       tc01 = new TC01(this);
     }
@@ -60,7 +61,10 @@ namespace PDP_8
 
     public int UnitIndex(int unitNum)
     {
-      return driveMap[unitNum];
+      for (int i = 0; i < InstalledDrives; ++i)
+        if (driveSelect[i] == unitNum)
+          return i;
+      return -1;
     }
 
     public bool TapeLoaded(int unitIndex)
@@ -99,12 +103,13 @@ namespace PDP_8
       {
         XmlLiteNode node = new XmlLiteNode(XmlTag);
         for (int i = 0; i < InstalledDrives; ++i)
+        {
+          XmlLiteNode drive = new XmlLiteNode("drive" + i.ToString());
           if (filenames[i] != null)
-          {
-            XmlLiteNode tape = new XmlLiteNode("tape", filenames[i]);
-            tape.SetAttribute("unit", i.ToString());
-            node.Children.Add(tape);
-          }
+            drive.Value = filenames[i];
+          drive.SetAttribute("unit", driveSelect[i].ToString());
+          node.Children.Add(drive);
+        }
 
         for (int i = 0; i < InstalledDrives; ++i)
           saveTape(i);
@@ -117,12 +122,21 @@ namespace PDP_8
         if (CheckTag(value, XmlTag))
           return;
 
+        restoringState = true;
         for (int i = 0; i < InstalledDrives; ++i)
-          filenames[i] = null;
+        {
+          XmlLiteNode drive = value["drive" + i.ToString()];
+          if (drive != null)
+          {
+            if (drive.Value != string.Empty)
+              filenames[i] = drive.Value;
+            else
+              filenames[i] = null;
 
-        foreach (XmlLiteNode node in value.Children)
-          if (node.Tag == "tape")
-            filenames[int.Parse(node.GetAttribute("unit"))] = node.Value;
+            driveControls[i].Value = int.Parse(drive.GetAttribute("unit"));
+          }
+        }
+        restoringState = false;
 
         for (int i = 0; i < InstalledDrives; ++i)
           restoreTape(i);
@@ -154,6 +168,10 @@ namespace PDP_8
     // *          *
     // ************
 
+    // When the user tries to change the unit select, prevent conflicts by skipping
+    // over numbers in use. But don't do this when restoring saved state.
+    bool restoringState = false;
+
     // Prevent unitNum conflicts
     private void unit0Numeric_ValueChanged(object sender, EventArgs e)
     {
@@ -161,20 +179,20 @@ namespace PDP_8
       int newUnitNum = (int)nud.Value;
       int unitIndex = getUnitIndex(sender);
 
-      int oldUnitNum;
-      for (oldUnitNum = 0; driveMap[oldUnitNum] != unitIndex; ++oldUnitNum) ;
-
-      driveMap[oldUnitNum] = -1;
-
-      // If not visible, restore state is causing this event. Don't correct it.
-      if (Visible)
+      if (restoringState)
       {
-        int del = Math.Sign(newUnitNum - oldUnitNum);
-        while (driveMap[newUnitNum] >= 0)
-          newUnitNum = (newUnitNum + del) % 8;
+        driveSelect[unitIndex] = newUnitNum;
+        return;
       }
 
-      driveMap[newUnitNum] = unitIndex;
+      int oldUnitNum = driveSelect[unitIndex];
+      driveSelect[unitIndex] = -1;
+      int del = Math.Sign(newUnitNum - oldUnitNum);
+
+      while (UnitIndex(newUnitNum) >= 0)
+        newUnitNum = (newUnitNum + del) % 8;
+
+      driveSelect[unitIndex] = newUnitNum;
       nud.Value = newUnitNum;
     }
 
@@ -237,6 +255,7 @@ namespace PDP_8
 
     private void DECtapeForm_Shown(object sender, EventArgs e)
     {
+      restoringState = false;
       timer1.Enabled = true;
     }
 
