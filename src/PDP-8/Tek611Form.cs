@@ -42,17 +42,17 @@ namespace PDP_8
       pal.Entries[1] = Color.White;
       bmp.Palette = pal;
 
+      RegisterAction("611", wakeup);
+
       Erase();
 
       BackgroundImage = bmp;
-
-      RegisterAction("Tek611", wakeup);
-      wakeup();
     }
 
     void setScreenChanged()
     {
       screenChanged = nonStoreMode ? 2 : 1;
+      CallMeReal("611", 1.0e6 / 6, true);
     }
 
     public void Erase()
@@ -117,14 +117,13 @@ namespace PDP_8
       Invalidate();
     }
 
-    void wakeup()
+    private void wakeup()
     {
       if (screenChanged > 0)
       {
         --screenChanged;
         update();
       }
-      CallMeReal("Tek611", 1.0e6 / 6.0);
     }
 
     private void Tek611Form_FormClosing(object sender, FormClosingEventArgs e)

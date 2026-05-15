@@ -1,9 +1,16 @@
-﻿using CSharpCommon;
+﻿// *****************
+// *               *
+// *  PPI Display  *
+// *               *
+// *****************
+
+using CSharpCommon;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
@@ -16,10 +23,12 @@ namespace PDP_8
 {
   public partial class PPIForm : Form
   {
-    const int MaxRange = 250;   // km
-    const int ImageDimension = 2 * MaxRange + 1;
+    const int MaxRange = 250;   // km = pixel
+    const int ImageRadius = MaxRange + 20;
+    const int ImageDimension = 2 * ImageRadius + 1;
     const double kmPerNmi = 1.852;
 
+    // Form background image
     Bitmap bmp;
 
     // For drawing rays
@@ -28,8 +37,13 @@ namespace PDP_8
     int binRes;       // half-nmi per bin
     int mapIndex;     // index into binMap[azimuth]
 
-    // 1D array for faster access with compiled binMap data. Each byte is 1 kn x 1 km.
-    byte[] dbzMap = new byte[ImageDimension * ImageDimension];
+    // List of (offset, count) row descriptors in circular PPI region
+    // of image
+    List<(int, int)> ppiPixels = new List<(int, int)>();
+    int ppiRow0;    // y coord of first row
+
+    // Pixels in PPI region of image. Each pixel is 1 kn x 1 km.
+    byte[] dbzMap;
 
     // For each azimuth, a list of dbzMap indices for each half-nmi bin. The values for
     // a bin are a count followed by count indices. Count may be 0. Count -1 terminates
@@ -42,7 +56,7 @@ namespace PDP_8
 
     // Screen fade in non-color mode. dbzMap values persist for maxLife update
     // cycles, then fade to black.
-    byte[] lifeTime = new byte[ImageDimension * ImageDimension];
+    byte[] lifeTime;
     const byte maxLife = 80;
 
     // Ray format used by RADAR
@@ -59,7 +73,28 @@ namespace PDP_8
     RayPhase rayPhase = RayPhase.Idle;
     bool colorMode { get { return colorCheck.Checked; } }
 
-    bool screenChanged = false;
+    bool screenChanged_;
+    bool screenChanged
+    {
+      get => screenChanged_;
+      set
+      {
+        screenChanged_ = value;
+        if (value)
+          CallMeReal("ppi", 1.0e6 / 8, true);
+      }
+    }
+
+    public void SetElevation(double el)
+    {
+      elLabel.Text = el.ToString("f1");
+    }
+
+    // *****************
+    // *               *
+    // *  Constructor  *
+    // *               *
+    // *****************
 
     public PPIForm()
     {
@@ -68,15 +103,23 @@ namespace PDP_8
       bmp = new Bitmap(ImageDimension, ImageDimension, PixelFormat.Format8bppIndexed);
       setPalette();
 
+      az0Label.BackColor = Color.Beige;
+      el0Label.BackColor = Color.Beige;
+
+      RegisterAction("ppi", wakeup);
+
+      setBackground(255);
+      initMap();
       erase();
 
       BackgroundImage = bmp;
-
-      initMap();
-
-      RegisterAction("PPI", wakeup);
-      wakeup();
     }
+
+    // *****************************
+    // *                           *
+    // *  Image and Palette Setup  *
+    // *                           *
+    // *****************************
 
     void initMap()
     {
@@ -90,18 +133,47 @@ namespace PDP_8
 
       // Every 1 km x 1 km pixel in dbzMap is owned by one 1 degree x 1/2 nmi
       // bin. Find them all.
-      for (int i = 0; i < dbzMap.Length; ++i)
-      {
-        double x = i % ImageDimension - MaxRange;
-        double y = i / ImageDimension - MaxRange;
-        int angle = MathUtil.mod((int)Math.Round(MathUtil.Degrees(Math.Atan2(y, x))), 360);
-        double range = MathUtil.EuclidDist(x, y);
-        int bin = (int)Math.Round(range / kmPerNmi * 2.0);
-        map[angle].Add((bin, i));
 
-        if ((int)Math.Round(range) % 50 == 0 && range <= MaxRange + 25)
-          rangeRings[angle].Add(i);
+      int pMap = 0;    // index intp dmzMap
+      ppiRow0 = -1;    // first non-empty row
+
+      for (int j = 0; j < ImageDimension; ++j)
+      {
+        int rowOffset = -1;
+        int rowCount = 0;
+
+        for (int i = 0; i < ImageDimension; ++i)
+        {
+          double x = i - ImageRadius;
+          double y = j - ImageRadius;
+          double range = MathUtil.EuclidDist(x, y);
+
+          if (range <= MaxRange)
+          {
+            int angle = MathUtil.mod((int)Math.Round(MathUtil.Degrees(Math.Atan2(y, x))), 360);
+            int bin = (int)Math.Round(range / kmPerNmi * 2.0);
+            map[angle].Add((bin, pMap));
+
+            if ((int)Math.Round(range) % 50 == 0 && range < MaxRange)
+              rangeRings[angle].Add(pMap);
+
+            if (rowOffset < 0)
+              rowOffset = i;
+            ++rowCount;
+
+            if (ppiRow0 < 0)
+              ppiRow0 = j;
+
+            ++pMap;
+          }
+        }
+
+        if (rowCount > 0)
+          ppiPixels.Add((rowOffset, rowCount));
       }
+
+      dbzMap = new byte[pMap];
+      lifeTime = new byte[pMap];
 
       // Sort each list by increasing bin number. Ties are sorted by dbzMap index, which
       // doesn't really matter but may slightly improve data cache performance.
@@ -150,18 +222,26 @@ namespace PDP_8
       {
         for (int i = 0; i < 128; ++i)
           pal.Entries[i] = colors[Math.Min(i / 10, colors.Length - 1)];
-        for (int z = 1; z < 256; z += 2)
+        for (int z = 1; z < 255; z += 2)
           pal.Entries[z / 2 + 128] = Color.FromArgb(z, z, z);
       }
       else
-        for (int i = 0; i < 256; i++)
+        for (int i = 0; i < 255; i++)
         {
           int z = Math.Min((int)Math.Round(i / 63.0 * 255.0), 255);
           pal.Entries[i] = Color.FromArgb(z, z, z);
         }
 
+      pal.Entries[255] = Color.Beige;
+
       bmp.Palette = pal;
     }
+
+    // ****************************
+    // *                          *
+    // *  Process Ray from PDP-8  *
+    // *                          *
+    // ****************************
 
     public void Ray(int w)
     {
@@ -183,7 +263,9 @@ namespace PDP_8
           break;
 
         case RayPhase.Azimuth:
-          azimuth = MathUtil.mod((int)Math.Round(w * 360.0 / 4096.0 - 90.0), 360);
+          double azDeg = w * 360.0 / 4096.0;
+          azLabel.Text = azDeg.ToString("f1");
+          azimuth = MathUtil.mod((int)Math.Round(azDeg - 90.0), 360);
           rayPhase = RayPhase.Unknown;
           break;
 
@@ -229,7 +311,7 @@ namespace PDP_8
 
           if (++binCounter == 100)
           {
-            byte z = (byte)(colorMode ? 255 : 64);
+            byte z = (byte)(colorMode ? 254 : 64);
             foreach (int index in rangeRings[azimuth])
             {
               dbzMap[index] = z;
@@ -245,11 +327,49 @@ namespace PDP_8
       }
     }
 
+    // **************************
+    // *                        *
+    // *  Background and Erase  *
+    // *                        *
+    // **************************
+
     void erase()
     {
-      Array.Clear(dbzMap);
+      for (int i = 0; i < dbzMap.Length; ++i)
+        dbzMap[i] = 0;
       screenChanged = true;
     }
+
+    void setBackground(byte z)
+    {
+      BitmapData data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height),
+                                     ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
+      try
+      {
+        int stride = data.Stride;
+        IntPtr scan0 = data.Scan0;
+
+        unsafe
+        {
+          for (int y = 0; y < ImageDimension; ++y)
+          {
+            byte* row = (byte*)scan0 + (y * stride);
+            for (int x = 0; x < ImageDimension; ++x)
+              row[x] = z;
+          }
+        }
+      }
+      finally
+      {
+        bmp.UnlockBits(data);
+      }
+    }
+
+    // ******************
+    // *                *
+    // *  Update Image  *
+    // *                *
+    // ******************
 
     private void update()
     {
@@ -265,15 +385,16 @@ namespace PDP_8
         unsafe
         {
           int p = 0;
-          for (int y = 0; y < bmp.Height; ++y)
+          int y = ppiRow0;
+          foreach (var rowBounds in ppiPixels)
           {
-            byte* row = (byte*)scan0 + (y * stride);
+            byte* row = (byte*)scan0 + (y++ * stride) + rowBounds.Item1;
 
             if (colorMode)
-              for (int x = 0; x < ImageDimension; ++x)
+              for (int x = 0; x < rowBounds.Item2; ++x)
                 row[x] = dbzMap[p++];
             else
-              for (int x = 0; x < ImageDimension; ++x, ++p)
+              for (int x = 0; x < rowBounds.Item2; ++x, ++p)
                 if ((row[x] = dbzMap[p]) > 0)
                 {
                   if (lifeTime[p] > 0)
@@ -294,13 +415,17 @@ namespace PDP_8
       Invalidate();
     }
 
-    void wakeup()
+    private void wakeup()
     {
       if (screenChanged)
         update();
-
-      CallMeReal("PPI", 1.0e6 / 8.0);
     }
+
+    // ************
+    // *          *
+    // *  Events  *
+    // *          *
+    // ************
 
     private void PPIForm_FormClosing(object sender, FormClosingEventArgs e)
     {
@@ -321,5 +446,65 @@ namespace PDP_8
     {
       erase();
     }
+
+    private void PPIForm_Paint(object sender, PaintEventArgs e)
+    {
+      float dim = Math.Min(ClientRectangle.Width, ClientRectangle.Height);
+      dim *= (float)MaxRange / ImageRadius;
+
+      float x0 = (ClientRectangle.Width - dim) / 2;
+      float y0 = (ClientRectangle.Height - dim) / 2;
+      RectangleF ppi = new RectangleF(x0, y0, dim, dim);
+
+      using (var pen = new Pen(Color.SlateGray, 16))
+        e.Graphics.DrawEllipse(pen, ppi);
+
+      float r0 = dim / 2 + 8;
+      x0 = ClientRectangle.Width / 2.0f;
+      y0 = ClientRectangle.Height / 2.0f;
+
+      using (var pen = new Pen(Color.Green, 4))
+        for (int i = 0; i < 360; i += 15)
+        {
+          float r1 = r0 * (i % 45 == 0 ? 1.05f : 1.025f);
+          double t = MathUtil.Radians(i);
+          float cs = (float)Math.Cos(t);
+          float sn = (float)Math.Sin(t);
+          e.Graphics.DrawLine(pen, x0 + r0 * cs, y0 + r0 * sn, x0 + r1 * cs, y0 + r1 * sn);
+        }
+    }
+
+    private void PPIForm_Resize(object sender, EventArgs e)
+    {
+      int dim = Math.Min(ClientRectangle.Width, ClientRectangle.Height);
+      int x0 = (ClientRectangle.Width - dim) / 2;
+      int y0 = (ClientRectangle.Height - dim) / 2;
+      int x1 = x0 + dim;
+      int y1 = y0 + dim;
+
+      colorCheck.Left = x1 - colorCheck.Width;
+      colorCheck.Top = y1 - colorCheck.Height;
+
+      eraseButton.Left = x1 - eraseButton.Width;
+      eraseButton.Top = colorCheck.Top - eraseButton.Height;
+
+      int offset = dim / 28;
+      az0Label.Left = azLabel.Left = x0 + offset;
+      az0Label.Top = y0 + offset;
+      azLabel.Top = az0Label.Bottom;
+
+      el0Label.Left = x1 - el0Label.Width - offset;
+      el0Label.Top = y0 + offset;
+
+      elLabel.Left = x1 - elLabel.Width - offset;
+      elLabel.Top = el0Label.Bottom;
+    }
+
+    private void PPIForm_Shown(object sender, EventArgs e)
+    {
+      PPIForm_Resize(sender, e);
+      screenChanged = true;
+    }
+
   }
 }

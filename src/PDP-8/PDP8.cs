@@ -173,7 +173,7 @@ public static class PDP8
   public static Action ResolveAction(string id)
   {
     if (!actionRegistry.ContainsKey(id))
-      throw new Exception("Unknown action registry id" + id);
+      throw new Exception("Unknown action registry id " + id);
     return actionRegistry[id];
   }
 

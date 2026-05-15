@@ -466,7 +466,7 @@ namespace PDP_8
     {
       // Keep aspect ratio
       // Prevent recursive resize loops
-      if (adjusting)
+      if (adjusting || this.WindowState == FormWindowState.Minimized)
         return;
       adjusting = true;
 

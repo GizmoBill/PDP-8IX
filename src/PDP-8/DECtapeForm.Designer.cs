@@ -75,7 +75,7 @@
       dectape0.Location = new Point(12, 61);
       dectape0.MinimumSize = new Size(220, 120);
       dectape0.Name = "dectape0";
-      dectape0.ReelRadiusPixels = 75F;
+      dectape0.ReelRadiusLogical = 50;
       dectape0.RightReelLabel = "MIT";
       dectape0.Size = new Size(442, 280);
       dectape0.TabIndex = 4;
@@ -91,7 +91,7 @@
       dectape1.Location = new Point(12, 413);
       dectape1.MinimumSize = new Size(220, 120);
       dectape1.Name = "dectape1";
-      dectape1.ReelRadiusPixels = 75F;
+      dectape1.ReelRadiusLogical = 50;
       dectape1.RightReelLabel = "HRP";
       dectape1.Size = new Size(442, 280);
       dectape1.TabIndex = 4;

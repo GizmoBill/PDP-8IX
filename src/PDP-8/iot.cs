@@ -171,6 +171,16 @@ public class ClockQueue
       time = double.Parse(ph[0]);
       for (int i = 1; i < ph.Count; ++i)
       {
+        // If the ID is no longer registered, ignore it
+        try
+        {
+          ResolveAction(ph.Name(i));
+        }
+        catch (Exception)
+        {
+          continue;
+        }
+
         double t = double.Parse(ph[i]);
         if (t >= time)    // fix bug in previously saved queues
           queue.Add((t, ph.Name(i)));
@@ -2272,6 +2282,7 @@ public class HRP : IODevice
 public class Integrator : IODevice
 {
   private HRPForm hrp;
+  private PPIForm ppi;
 
   int icw1_;
   int icw2_;
@@ -2368,9 +2379,10 @@ public class Integrator : IODevice
     get { return (icw2 & 0x07F) * 4000.0; }
   }
 
-  public Integrator(HRPForm hrpForm)
+  public Integrator(HRPForm hrpForm, PPIForm ppiForm)
   {
     hrp = hrpForm;
+    ppi = ppiForm;
 
     RegisterDevice(FromOctal("32"), this);    // SRA, load integrator control words
     RegisterDevice(FromOctal("33"), this);    // RVI, read integrator bins
@@ -2444,7 +2456,9 @@ public class Integrator : IODevice
 
             double az = (double)(wr73Selected ? hrp.wr73AzNumeric.Value : hrp.wr66AzNumeric.Value);
             az = MathUtil.Radians(90.0 - az) - ang0;
-            double el = MathUtil.Radians((double)(wr73Selected ? hrp.wr73ElNumeric.Value : hrp.wr66ElNumeric.Value));
+            double el = (double)(wr73Selected ? hrp.wr73ElNumeric.Value : hrp.wr66ElNumeric.Value);
+            ppi.SetElevation(el);
+            el = MathUtil.Radians(el);
 
             rx = Math.Cos(az) * Math.Cos(el);
             ry = Math.Sin(az) * Math.Cos(el);

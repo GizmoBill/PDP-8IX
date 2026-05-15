@@ -51,6 +51,7 @@
       dECtapeToolStripMenuItem = new ToolStripMenuItem();
       hRPToolStripMenuItem = new ToolStripMenuItem();
       tektronix611ToolStripMenuItem = new ToolStripMenuItem();
+      pPIToolStripMenuItem = new ToolStripMenuItem();
       optionsToolStripMenuItem = new ToolStripMenuItem();
       x10ToolStripMenuItem = new ToolStripMenuItem();
       showFrontPanelToolStripMenuItem = new ToolStripMenuItem();
@@ -104,7 +105,6 @@
       label2 = new Label();
       label1 = new Label();
       runTimer = new System.Windows.Forms.Timer(components);
-      pPIToolStripMenuItem = new ToolStripMenuItem();
       menuStrip1.SuspendLayout();
       panel1.SuspendLayout();
       SuspendLayout();
@@ -218,44 +218,51 @@
       // tty1ConsoleToolStripMenuItem
       // 
       tty1ConsoleToolStripMenuItem.Name = "tty1ConsoleToolStripMenuItem";
-      tty1ConsoleToolStripMenuItem.Size = new Size(270, 34);
+      tty1ConsoleToolStripMenuItem.Size = new Size(219, 34);
       tty1ConsoleToolStripMenuItem.Text = "TTY1";
       tty1ConsoleToolStripMenuItem.Click += aSR38ConsoleToolStripMenuItem_Click;
       // 
       // tTY2ToolStripMenuItem
       // 
       tTY2ToolStripMenuItem.Name = "tTY2ToolStripMenuItem";
-      tTY2ToolStripMenuItem.Size = new Size(270, 34);
+      tTY2ToolStripMenuItem.Size = new Size(219, 34);
       tTY2ToolStripMenuItem.Text = "TTY2";
       tTY2ToolStripMenuItem.Click += tTY2ToolStripMenuItem_Click;
       // 
       // rK05ToolStripMenuItem
       // 
       rK05ToolStripMenuItem.Name = "rK05ToolStripMenuItem";
-      rK05ToolStripMenuItem.Size = new Size(270, 34);
+      rK05ToolStripMenuItem.Size = new Size(219, 34);
       rK05ToolStripMenuItem.Text = "RK05";
       rK05ToolStripMenuItem.Click += rK05ToolStripMenuItem_Click;
       // 
       // dECtapeToolStripMenuItem
       // 
       dECtapeToolStripMenuItem.Name = "dECtapeToolStripMenuItem";
-      dECtapeToolStripMenuItem.Size = new Size(270, 34);
+      dECtapeToolStripMenuItem.Size = new Size(219, 34);
       dECtapeToolStripMenuItem.Text = "DECtape";
       dECtapeToolStripMenuItem.Click += dECtapeToolStripMenuItem_Click;
       // 
       // hRPToolStripMenuItem
       // 
       hRPToolStripMenuItem.Name = "hRPToolStripMenuItem";
-      hRPToolStripMenuItem.Size = new Size(270, 34);
+      hRPToolStripMenuItem.Size = new Size(219, 34);
       hRPToolStripMenuItem.Text = "HRP";
       hRPToolStripMenuItem.Click += hRPToolStripMenuItem_Click;
       // 
       // tektronix611ToolStripMenuItem
       // 
       tektronix611ToolStripMenuItem.Name = "tektronix611ToolStripMenuItem";
-      tektronix611ToolStripMenuItem.Size = new Size(270, 34);
+      tektronix611ToolStripMenuItem.Size = new Size(219, 34);
       tektronix611ToolStripMenuItem.Text = "Tektronix 611";
       tektronix611ToolStripMenuItem.Click += tektronix611ToolStripMenuItem_Click;
+      // 
+      // pPIToolStripMenuItem
+      // 
+      pPIToolStripMenuItem.Name = "pPIToolStripMenuItem";
+      pPIToolStripMenuItem.Size = new Size(219, 34);
+      pPIToolStripMenuItem.Text = "PPI";
+      pPIToolStripMenuItem.Click += pPIToolStripMenuItem_Click;
       // 
       // optionsToolStripMenuItem
       // 
@@ -827,15 +834,8 @@
       // 
       // runTimer
       // 
-      runTimer.Interval = 3;
+      runTimer.Interval = 15;
       runTimer.Tick += runTimer_Tick;
-      // 
-      // pPIToolStripMenuItem
-      // 
-      pPIToolStripMenuItem.Name = "pPIToolStripMenuItem";
-      pPIToolStripMenuItem.Size = new Size(270, 34);
-      pPIToolStripMenuItem.Text = "PPI";
-      pPIToolStripMenuItem.Click += pPIToolStripMenuItem_Click;
       // 
       // ConsoleForm
       // 

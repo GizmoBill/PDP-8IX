@@ -28,7 +28,7 @@ namespace DECtapeControl
     // *********************************
 
     public float BaseLinearSpeed { get; set; } = 180f; // pixels/sec at SpeedFactor = 1
-    public float ReelRadiusPixels { get; set; } = 75;
+    public int ReelRadiusLogical { get; set; } = 50;
 
     public string LeftReelLabel { get; set; } = string.Empty;
 
@@ -46,6 +46,8 @@ namespace DECtapeControl
     }
 
     public bool UseInternalTimer {  get; set; }
+
+    private float reelRadiusPixels { get { return LogicalToDeviceUnits(ReelRadiusLogical); } }
 
     // *****************
     // *               *
@@ -160,7 +162,7 @@ namespace DECtapeControl
       get
       {
         float r = emptyTapeRadius + (fullTapeRadius - emptyTapeRadius) * TapeFillFactor;
-        return r * ReelRadiusPixels;
+        return r * reelRadiusPixels;
       }
     }
 
@@ -170,7 +172,7 @@ namespace DECtapeControl
       get
       {
         float r = emptyTapeRadius + (fullTapeRadius - emptyTapeRadius) * (1f - TapeFillFactor);
-        return r * ReelRadiusPixels;
+        return r * reelRadiusPixels;
       }
     }
 
@@ -269,7 +271,7 @@ namespace DECtapeControl
 
     public void ComputeGeometry(Rectangle rect)
     {
-      float R = ReelRadiusPixels;
+      float R = reelRadiusPixels;
 
       // Reel spacing ~2.6R
       _reelSpacing = R * 2.6f;
@@ -354,7 +356,7 @@ namespace DECtapeControl
     private void DrawTape(Graphics g, Point leftCenter, Point rightCenter)
     {
       // Replaced Copilot poor attenpt
-      float R = ReelRadiusPixels;
+      float R = reelRadiusPixels;
       float tapeThickness = 6f;   // thin side-view tape
 
       float midX = 0.5f * (leftCenter.X + rightCenter.X);
@@ -381,7 +383,7 @@ namespace DECtapeControl
 
     private void DrawReel(Graphics g, Point center, float angleDeg, string label)
     {
-      float radius = ReelRadiusPixels;
+      float radius = reelRadiusPixels;
       var reelRect = new RectangleF(center.X - radius, center.Y - radius,
                                     radius * 2, radius * 2);
 
@@ -457,8 +459,8 @@ namespace DECtapeControl
       {
         string c = label.Substring(i, 1);
         float charWd = g.MeasureString(c, Font).Width;
-        g.DrawString(c, Font, Brushes.Red, -0.5f * charWd, -ReelRadiusPixels);
-        g.RotateTransform((float)MathUtil.Degrees(charWd / ReelRadiusPixels));
+        g.DrawString(c, Font, Brushes.Red, -0.5f * charWd, -reelRadiusPixels);
+        g.RotateTransform((float)MathUtil.Degrees(charWd / reelRadiusPixels));
       }
     }
 
@@ -536,7 +538,7 @@ namespace DECtapeControl
 
     private void DrawScrew(Graphics g, Point center)
     {
-      int r = (int)(ReelRadiusPixels * 0.07f);
+      int r = (int)(reelRadiusPixels * 0.07f);
 
       using (var ringBrush = new LinearGradientBrush(
           new Rectangle(center.X - r, center.Y - r, r * 2, r * 2),
