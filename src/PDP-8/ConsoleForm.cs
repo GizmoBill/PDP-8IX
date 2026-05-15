@@ -228,6 +228,7 @@ namespace PDP_8
 
       cycleCount = 0;
       realTime = 0;
+      syncCycleTimer();
     }
 
     private void newToolStripMenuItem_Click(object sender, EventArgs e)
@@ -678,40 +679,56 @@ namespace PDP_8
     // ***************
 
     // Times in microsecs
-    const double runTimerInterval = 1.0e6 / 64.0;
-
     private double cycleTimeTarget = 1.5;
 
-    double burstTime = runTimerInterval;   // microseconds, measured, filtered
-    double runTimeFilter = (1.0 - 1 / Math.E) * runTimerInterval / 1.0e6; // one sec time constant
+    double burstTime = 0;         // Time to run the cycle burst, measured, filtered
+    double timerPeriod = 0;       // measured, filtered timer interval
+    double maxTimerPeriod = 0;
 
-    private int cycleBurst { get { return (int)Math.Round(runTimerInterval / cycleTimeTarget); } }
+    double runTimeFilter = (1.0 - 1 / Math.E) / 64; // one sec time constant at 64 Hz
 
+    // Every 8 timer ticks, the front panels are updated
     int runUpdateCounter = 0;
 
+    // These are for the clock queues
     long cycleCount = 0;
-    double realTime = 0;
+    double realTime;
 
+    // Simulating the lights is expensive, so sample the CPU by a set of
+    // periods to avoid getting in sync with a loop
     int[] lightSampleCounts = { 3, 5, 7, 11 };
+
+    double cycleT0;     // Start time of current tick
+    Stopwatch cycleTimer = new Stopwatch();
+
+    double lastTime = 0;
+
+    void syncCycleTimer()
+    {
+      lastTime = cycleT0 = realTime;
+      cycleTimer.Reset();
+      cycleTimer.Start();
+    }
 
     private void runTimer_Tick(object sender, EventArgs e)
     {
-      Stopwatch cycleTimer = new Stopwatch();
-      cycleTimer.Start();
+      double t0 = cycleTimer.Elapsed.TotalMicroseconds + cycleT0;
 
-      int cycles;
-
-      // Simulating the lights is expensive, so sample the CPU by a set of
-      // periods to avoid getting in sync with a loop
       int lightSampleIndex = 0;
       int lightSampleCounter = 0;
       bool doLights = frontPanel.Visible;
+
+      int cycles = 0;
+
+      double cycleTimerTime = t0;
 
 #if !DEBUG
       try
 #endif
       {
-        for (cycles = 0; cycles < cycleBurst; ++cycles)
+        // Run until simulated realTime catches up with StopWatch time, but no longer
+        // than 12.5 ms.
+        while (realTime < cycleTimerTime && cycleTimerTime - t0 < 12500.0)
         {
           Cpu.Cycle();
 
@@ -737,8 +754,10 @@ namespace PDP_8
           }
 
           // Stopwatch is slow
-          if ((cycles % 64) == 0 && cycleTimer.Elapsed.TotalMicroseconds >= 0.90 * runTimerInterval)
-            break;
+          if ((cycles % 64) == 0)
+            cycleTimerTime = cycleTimer.Elapsed.TotalMicroseconds + cycleT0;
+
+          ++cycles;
         }
       }
 #if !DEBUG
@@ -750,16 +769,20 @@ namespace PDP_8
       }
 #endif
 
-      cycleTimer.Stop();
-
-      double t = cycleTimer.Elapsed.TotalMicroseconds;
-      burstTime += (t - burstTime) * runTimeFilter;
+      // Update filtered measurements
+      burstTime += (cycleTimerTime - t0 - burstTime) * runTimeFilter;
+      timerPeriod += (t0 - lastTime - timerPeriod) * runTimeFilter;
+      maxTimerPeriod = Math.Max(maxTimerPeriod, t0 - lastTime);
+      lastTime = t0;
 
       if (++runUpdateCounter == 8)
       {
-        cpuCycleTimeLabel.Text = cycleTimeTarget.ToString("f3");
+        //cpuCycleTimeLabel.Text = cycleTimeTarget.ToString("f3");
+        cpuCycleTimeLabel.Text = (timerPeriod / 1000.0).ToString("f1");
+        //cpuCycleTimeLabel.Text = (maxTimerPeriod / 1000.0).ToString("f1");
+
         burstCycleTimeLabel.Text = (burstTime / cycles).ToString("f3");
-        busyTimeLabel.Text = (burstTime / runTimerInterval * 100.0).ToString("f1");
+        busyTimeLabel.Text = (burstTime / timerPeriod * 100.0).ToString("f1");
 
         updateCheapPanel();
         if (doLights)
@@ -803,6 +826,7 @@ namespace PDP_8
 
             case "realTime":
               realTime = double.Parse(ph[i]);
+              syncCycleTimer();
               break;
 
             default:
@@ -927,6 +951,7 @@ namespace PDP_8
         rk05Form.LoadDrives();
       }
 
+      syncCycleTimer();
       runTimer.Enabled = true;
     }
 
