@@ -1,0 +1,13 @@
+pip install arm-pyart
+pip install nexradaws
+pip install numpy
+pip install scipy
+
+Press Windows + R
+Type: gpedit.msc (Group Policy Editor)
+Navigate to: Computer Configuration → Administrative Templates → System → Filesystem
+Find: "Enable Win32 long paths"
+Double-click it and select "Enabled"
+Click OK and close
+Reboot your computer
+

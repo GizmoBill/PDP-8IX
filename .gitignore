@@ -8,6 +8,13 @@ bin/
 obj/
 publish/
 
+# Nexrad artifacts
+build/
+dist/
+logs/
+radar_data/
+__pycache__
+
 # NuGet
 packages/
 *.nupkg

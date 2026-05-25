@@ -93,7 +93,7 @@ namespace PDP_8
       {
         XmlLiteNode state = new XmlLiteNode(XmlTag);
 
-        XmlLiteNode node = new XmlLiteNode("paper", paperText.Text);
+        XmlLiteNode node = new XmlLiteNode("rtf", paperText.Rtf);
         node.SetAttribute("noIndent", "true");
         state.Children.Add(node);
 
@@ -122,7 +122,10 @@ namespace PDP_8
         if (PDP8.CheckTag(value, XmlTag))
           return;
 
-        paperText.Text = value["paper"].Value;
+        if (value["rtf"] != null)
+          paperText.Rtf = value["rtf"].Value;
+        else if (value["paper"] != null)
+          paperText.Text = value["paper"].Value;
         setVT100Text(value["screen"].Value);
         paperText.Select(paperText.TextLength, 0);
 
@@ -300,7 +303,7 @@ namespace PDP_8
       if (vt100Check.Checked)
       {
         printer.PrintOne = vt100Print;
-        savePaper = paperText.Text;
+        savePaper = paperText.Rtf;
         saveASR33Size = this.Size;
         clearButton.Visible = false;
         this.Size = new Size(1078, 1354);
@@ -313,7 +316,8 @@ namespace PDP_8
         Text = "ASR-38";
         this.Size = saveASR33Size;
         clearButton.Visible = true;
-        replaceText(savePaper);
+        paperText.Rtf = savePaper;
+        setCursor();
       }
 
       paperText.Focus();

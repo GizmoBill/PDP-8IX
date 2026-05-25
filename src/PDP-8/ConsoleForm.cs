@@ -50,6 +50,8 @@ namespace PDP_8
 
     private PPIForm ppiForm;
 
+    private NexradForm nexradForm;
+
     // *****************
     // *               *
     // *  Constructor  *
@@ -71,7 +73,8 @@ namespace PDP_8
       rk05Form = new RK05Form();
 
       ppiForm = new PPIForm();
-      hrpForm = new HRPForm(ppiForm);
+      nexradForm = new NexradForm(ppiForm);
+      hrpForm = new HRPForm(ppiForm, nexradForm);
 
       documentFilename = null;
 
@@ -228,7 +231,7 @@ namespace PDP_8
 
       cycleCount = 0;
       realTime = 0;
-      syncCycleTimer();
+      SyncCycleTimer();
     }
 
     private void newToolStripMenuItem_Click(object sender, EventArgs e)
@@ -362,6 +365,12 @@ namespace PDP_8
       ppiForm.BringToFront();
     }
 
+    private void nexradToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+      nexradForm.Show();
+      nexradForm.BringToFront();
+    }
+
     // ******************
     // *                *
     // *  Analyze Menu  *
@@ -403,7 +412,6 @@ namespace PDP_8
     {
       Cpu.EventRecorder.Clear();
     }
-
 
     // ************************
     // *                      *
@@ -677,13 +685,28 @@ namespace PDP_8
     // *  Run Timer  *
     // *             *
     // ***************
+    //
+    // The runTimer is the heartbeat of the simulator. The actions of the CPU
+    // and all I/O devices are triggered by runTimer_Tick by calling Cpu.Cycle,
+    // SetClockQueueTime, and ProcessLights. Every CPU cycle consumes
+    // cycleTimeTarget us of simulated real time, 1.5 us or 0.15 us in 10x mode.
+    // The realTime variable holds the number of simulated microseconds since
+    // Reset, which may have heppened in a previous run of the simulator and
+    // restored in the current run. Executing a cycle is usually much faster
+    // than cycleTimeTarget, even in 10x mode. A Stopwatch is used to measure
+    // actual real time, and runTimer_Tick insures that simulated realtime
+    // matches actual realtime over human-detectable intervals by executing
+    // cycles until simulated time catches up to actual time. The result is that
+    // cycles are executed in bursts, typically around 10,000 cycles per timer
+    // tick (or 100,000 in 10x mode). This is computationally very efficient and
+    // allows the UI thread to be idle most of the time.
 
     // Times in microsecs
     private double cycleTimeTarget = 1.5;
 
     double burstTime = 0;         // Time to run the cycle burst, measured, filtered
     double timerPeriod = 0;       // measured, filtered timer interval
-    double maxTimerPeriod = 0;
+    double maxTimerPeriod = 0;    // running max measured time
 
     double runTimeFilter = (1.0 - 1 / Math.E) / 64; // one sec time constant at 64 Hz
 
@@ -698,12 +721,12 @@ namespace PDP_8
     // periods to avoid getting in sync with a loop
     int[] lightSampleCounts = { 3, 5, 7, 11 };
 
-    double cycleT0;     // Start time of current tick
+    double cycleT0;     // offset of realTime wrt cycleTimer
     Stopwatch cycleTimer = new Stopwatch();
 
     double lastTime = 0;
 
-    void syncCycleTimer()
+    public void SyncCycleTimer()
     {
       lastTime = cycleT0 = realTime;
       cycleTimer.Reset();
@@ -746,18 +769,27 @@ namespace PDP_8
             lightSampleIndex = (lightSampleIndex + 1) % lightSampleCounts.Length;
           }
 
+          // Stopwatch is slow
+          if ((cycles % 64) == 0)
+            cycleTimerTime = cycleTimer.Elapsed.TotalMicroseconds + cycleT0;
+
+          ++cycles;
+
           if (!Cpu.IntSuppress)
           {
             ++cycleCount;
             realTime += cycleTimeTarget;
             SetClockQueueTime(cycleCount, realTime);
           }
-
-          // Stopwatch is slow
-          if ((cycles % 64) == 0)
-            cycleTimerTime = cycleTimer.Elapsed.TotalMicroseconds + cycleT0;
-
-          ++cycles;
+          // When interrupts are suppressed (by the user via the console or front panel,
+          // or by a breakpoint) realTime is not advancing. Do some cycles so that
+          // breakPorts can run, panel lights work, measurements and displays make
+          // sense. But no point in running until the 12.5 limit is reached, that just
+          // heats up the host CPU. Note that when IntSuppress is removed, SyncCycleTimer
+          // is called. For short duration suppression realTime could catch up quickly,
+          // but IntSuppress can last indefinitely.
+          else if (cycles == 1024)
+            break;
         }
       }
 #if !DEBUG
@@ -826,7 +858,7 @@ namespace PDP_8
 
             case "realTime":
               realTime = double.Parse(ph[i]);
-              syncCycleTimer();
+              SyncCycleTimer();
               break;
 
             default:
@@ -851,6 +883,7 @@ namespace PDP_8
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(tek611Form, "tek611"));
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(dectapeForm, "dectape"));
         root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(ppiForm, "ppiForm"));
+        root.Children.Add(CSharpCommon.PreserveState.GetFormStateX(nexradForm, "nexradForm"));
 
         root.Children.Add(CpuTime);
         root.Children.Add(tty1.State);
@@ -880,6 +913,7 @@ namespace PDP_8
         CSharpCommon.PreserveState.SetFormState(tek611Form, root, "tek611");
         CSharpCommon.PreserveState.SetFormState(dectapeForm, root, "dectape");
         CSharpCommon.PreserveState.SetFormState(ppiForm, root, "ppiForm");
+        CSharpCommon.PreserveState.SetFormState(nexradForm, root, "nexradForm");
 
         CpuTime = value["time"];
         tty1.State = value[tty1.XmlTag];
@@ -951,9 +985,8 @@ namespace PDP_8
         rk05Form.LoadDrives();
       }
 
-      syncCycleTimer();
+      SyncCycleTimer();
       runTimer.Enabled = true;
     }
-
   }
 }

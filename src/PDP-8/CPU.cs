@@ -541,8 +541,11 @@ namespace PDP_8
       {
         if (value)
           ion |= bkptSuppress;
-        else
+        else if (IntSuppress)
+        {
           ion &= ~bkptSuppress;
+          PDP8.Console.SyncCycleTimer();
+        }
       }
     }
 
@@ -1161,8 +1164,6 @@ namespace PDP_8
     // *  One CPU Cycle  *
     // *                 *
     // *******************
-
-
 
     public void Cycle()
     {

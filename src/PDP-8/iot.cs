@@ -2283,6 +2283,7 @@ public class Integrator : IODevice
 {
   private HRPForm hrp;
   private PPIForm ppi;
+  private NexradForm nexrad;
 
   int icw1_;
   int icw2_;
@@ -2318,9 +2319,15 @@ public class Integrator : IODevice
 
   int binskip { get { return icw1 >> 3; } }
 
-  double binres { get { return (icw1 & 7) / 2.0; } }
+  int binsize { get { return icw1 & 7; } }
+
+  double binres { get { return binsize / 2.0; } }
 
   bool wr73Selected { get { return (icw2 & 0x400) == 0; } }
+
+  // Nexrad ray, if available
+  byte[] nexradRay;
+  int nexradIndex;
 
   // Synthetic radar data. A 3D ellipsoid Gaussian centered at (x0, y0, z0), at
   // angle ang0, with stDev (xSigma, ySigma, zSigma). The IOT instructions set
@@ -2343,33 +2350,42 @@ public class Integrator : IODevice
   double k1 { get { return wr73Selected ? 444 : 245; } }
   double k2 { get { return wr73Selected ? 37 : 35; } }
 
-  // Retrieve the synthetic bin at the current range and angle.
+  // Retrieve the synthetic or Nexrad bin at the current range and angle.
   // RADAR bin processing:
   //       bin - NOIZL + k1
-  // dbZ = ---------------- + PT + 20 log(range / 16)
+  // dbZ = ---------------- - PT + 20 log(range / 16)
   //              k2
   int bin
   {
     get
     {
-      // Ellipsoid Gauss, compute sigma
-      double x = (range * rx - x0) / xSigma;
-      double y = (range * ry - y0) / ySigma;
-      double z = (range * rz - z0) / zSigma;
-
-      double sig2 = x * x + y * y + z * z;
-
       double dbz = 0;
-      if (sig2 <= maxSigma * maxSigma)
+
+      if (nexradRay == null)
       {
-        // Not noise, get z, range attenuation, convert to bin units
-        z = dbZMax * Math.Exp(-0.5 * sig2);
-        z -= 20 * Math.Log10(range / 16.0);
-        z = Math.Max(z * k2 - k1, 0);
+        // Ellipsoid Gauss, compute sigma
+        double x = (range * rx - x0) / xSigma;
+        double y = (range * ry - y0) / ySigma;
+        double z = (range * rz - z0) / zSigma;
+
+        double sig2 = x * x + y * y + z * z;
+
+        if (sig2 <= maxSigma * maxSigma)
+          dbz = dbZMax * Math.Exp(-0.5 * sig2);
+      }
+      else if (nexradIndex < nexradRay.Length)
+        dbz = nexradRay[nexradIndex];
+
+      // Range attenuation, convert to bin units
+      double signal = 0;
+      if (dbz > 0)
+      {
+        signal = dbz - 20 * Math.Log10(range / 16.0);
+        signal = Math.Max(signal * k2 - k1, 0);
       }
 
       // Add some noise
-      return (int)(z + grand.NextDouble()) + noiseLevel;
+      return (int)(signal + grand.NextDouble()) + noiseLevel;
     }
   }
 
@@ -2379,10 +2395,11 @@ public class Integrator : IODevice
     get { return (icw2 & 0x07F) * 4000.0; }
   }
 
-  public Integrator(HRPForm hrpForm, PPIForm ppiForm)
+  public Integrator(HRPForm hrpForm, PPIForm ppiForm, NexradForm nexradForm)
   {
     hrp = hrpForm;
     ppi = ppiForm;
+    nexrad = nexradForm;
 
     RegisterDevice(FromOctal("32"), this);    // SRA, load integrator control words
     RegisterDevice(FromOctal("33"), this);    // RVI, read integrator bins
@@ -2390,7 +2407,7 @@ public class Integrator : IODevice
     RegisterAction("integrator", integratorDone);
 
     grand.Mean = 0;
-    grand.Sigma = 24;
+    grand.Sigma = 12;
 
     Reset();
   }
@@ -2452,17 +2469,28 @@ public class Integrator : IODevice
           case 6:
             // ICW2
             icw2 = bus;
-            range = (binskip + 1) * binres;
 
+            range = (binskip + 1) * binres;
             double az = (double)(wr73Selected ? hrp.wr73AzNumeric.Value : hrp.wr66AzNumeric.Value);
-            az = MathUtil.Radians(90.0 - az) - ang0;
             double el = (double)(wr73Selected ? hrp.wr73ElNumeric.Value : hrp.wr66ElNumeric.Value);
             ppi.SetElevation(el);
-            el = MathUtil.Radians(el);
 
-            rx = Math.Cos(az) * Math.Cos(el);
-            ry = Math.Sin(az) * Math.Cos(el);
-            rz = Math.Sin(el);
+            if (nexrad.DataAvailable)
+            {
+              nexradRay = nexrad.nexradRays.GetRay(az, el);
+              nexradIndex = (binskip + 1) * binsize;
+            }
+            else
+            {
+              az = MathUtil.Radians(90.0 - az) - ang0;
+              el = MathUtil.Radians(el);
+
+              rx = Math.Cos(az) * Math.Cos(el);
+              ry = Math.Sin(az) * Math.Cos(el);
+              rz = Math.Sin(el);
+
+              nexradRay = null;
+            }
 
             CallMeReal("integrator", IntegrationPeriod);
             break;
@@ -2487,6 +2515,7 @@ public class Integrator : IODevice
             // Read next bin
             bus = bin;
             range += binres;
+            nexradIndex += binsize;
             break;
 
           default:

@@ -30,13 +30,13 @@ namespace PDP_8
 
     const string actionId = "hrpAction";
 
-    public HRPForm(PPIForm ppi)
+    public HRPForm(PPIForm ppi, NexradForm nexrad)
     {
       InitializeComponent();
 
       hrp = new HRP(this, ppi);
       a2d = new AF01A(this);
-      integ = new Integrator(this, ppi);
+      integ = new Integrator(this, ppi, nexrad);
 
       spyCombo.SelectedIndex = 0;
       esrCombo.SelectedIndex = 0;

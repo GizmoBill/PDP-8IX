@@ -4,8 +4,12 @@
 // *                     *
 // ***********************
 
-// Originally written by Microsoft Copilot, with major human
-// reorganization, improvements, and modifications.
+// Originally written by Microsoft Copilot, but so heavily reorganized,
+// modified, and improved that very little AI-written code is left. What
+// Copilot wrote was instructive but ultimately not very good.
+
+// Copilot: "you own it, and you own your modifications, and I do not claim
+// copyright in anything I generate for you."
 
 using CSharpCommon;
 using System;
