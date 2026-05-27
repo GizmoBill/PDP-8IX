@@ -296,12 +296,17 @@ namespace PDP_8
           {
             int count = binMap[azimuth][mapIndex++];
             if (count >= 0)
+            {
+              if (w >= 0x800)     // dbZ can be negative in close
+                w = 0;
+
               for (int i = 0; i < count; ++i)
               {
                 int index = binMap[azimuth][mapIndex++];
-                dbzMap[index] = (byte)w;
+                dbzMap[index] = (byte)w; 
                 lifeTime[index] = maxLife;
               }
+            }
             else
             {
               binCounter = 99;

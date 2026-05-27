@@ -2347,8 +2347,14 @@ public class Integrator : IODevice
   const double maxSigma = 2.0;
   const int noiseLevel = 256;
 
-  double k1 { get { return wr73Selected ? 444 : 245; } }
-  double k2 { get { return wr73Selected ? 37 : 35; } }
+  // Original PAL-8
+  //double k1 { get { return wr73Selected ? 444 : 245; } }
+  //double k2 { get { return wr73Selected ?  37 :  35; } }
+
+  // New. WR66 up sensitivity to match Nexrad
+  //      WR73 use handwritten values
+  double k1 { get { return wr73Selected ? 250 : -420; } }
+  double k2 { get { return wr73Selected ?  46 :   16; } }
 
   // Retrieve the synthetic or Nexrad bin at the current range and angle.
   // RADAR bin processing:
@@ -2407,7 +2413,7 @@ public class Integrator : IODevice
     RegisterAction("integrator", integratorDone);
 
     grand.Mean = 0;
-    grand.Sigma = 12;
+    grand.Sigma = 8;
 
     Reset();
   }

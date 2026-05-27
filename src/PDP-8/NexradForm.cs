@@ -10,7 +10,7 @@
 // NexradParser.py (in a parallel project). The XML file is here read, compiled
 // for fast execution, and made available to the Integrator I/O device. The
 // Integrator asks for a ray of dbZ values at a specific azimuth and elevation,
-// and code here finds the closet azimuth in the closes elevation sweep from
+// and code here finds the closet azimuth in the closest elevation sweep from
 // the Nexrad rays.
 //
 // fetch(), running on the UI thread, inkoves NexradParser.exe as a separate
@@ -18,7 +18,7 @@
 // Output from the exe (stdout and stderr) is monitored to learn the XML
 // filename and report errors; messages are received on a threadpool thread and
 // must not interact with Winforms, so they set status variables. When the exe
-// exits execution resumes in WaitForExitAsync() on a threadpool thread. The
+// exits, execution resumes in WaitForExitAsync() on a threadpool thread. The
 // wait/resume pattern uses the SynchronizationContext mechanism. If the
 // threadpool thread determines that the fetch was successful, it reads the
 // XML and compiles it. This can take a couple of seconds, but the UI thread is
@@ -124,8 +124,7 @@ namespace PDP_8
       if (process != null)
         return;
 
-      fetchButton.Enabled = false;
-      loadButton.Enabled = false;
+      setButtonStates();
 
       // Initialize so we can see what happened
       nexradDataFile = null;
@@ -171,11 +170,12 @@ namespace PDP_8
       {
         XmlLiteNode root = XmlLiteNode.ReadFromFile(nexradDataFile)["nexrad_data"];
         timestamp = DateTime.Parse(root["header"]["timestamp"].Value);
-        nexradRays.Convert(root);
+        nexradRays.Compile(root);
       }
       else
       {
-        errorMessage = "Can't find XML file";
+        if (errorMessage == null || warning)
+          errorMessage = "Can't find XML file";
         code = -1;
       }
 
@@ -227,8 +227,6 @@ namespace PDP_8
       if (exitCode == 0)
       {
         fetchTimeLabel.Text = timestamp.ToString("dd MMM yyyy HH:mm");
-        showButton.Enabled = true;
-        loadButton.Enabled = !liveCheck.Checked;
 
         if (!keepCheck.Checked)
         {
@@ -246,12 +244,19 @@ namespace PDP_8
       else
         fetchTimeLabel.Text = "error, no message";
 
-      fetchButton.Enabled = true;
+      setButtonStates();
     }
 
     public bool DataAvailable
     {
       get { return enableCheck.Checked && nexradRays.DataAvailable; }
+    }
+
+    void setButtonStates()
+    {
+      fetchButton.Enabled = process == null;
+      showButton.Enabled = nexradRays.DataAvailable;
+      loadButton.Enabled = process == null && !liveCheck.Checked;
     }
 
     // ********************************
@@ -280,9 +285,9 @@ namespace PDP_8
         get { return rays != null; }
       }
 
-      public void Convert(XmlLiteNode root)
+      public void Compile(XmlLiteNode root)
       {
-        // Runs on threadpool thread
+        // Runs on threadpool thread for fetch, UI thread for load. Not thread safe.
         XmlLiteNode headerNode = root["header"];
         XmlLiteNode sweepsNode = root["sweeps"];
         XmlLiteNode raysNode = root["rays"];
@@ -483,15 +488,15 @@ namespace PDP_8
         XmlLiteNode root = XmlLiteNode.ReadFromFile(ofd.FileName)["nexrad_data"];
         fetchTimeLabel.Text =
           DateTime.Parse(root["header"]["timestamp"].Value).ToString("dd MMM yyyy HH:mm");
-        nexradRays.Convert(root);
+        nexradRays.Compile(root);
         ppiDisplay();
-        fetchButton.Enabled = true;
+        setButtonStates();
       }
     }
 
     private void liveCheck_CheckedChanged(object sender, EventArgs e)
     {
-      loadButton.Enabled = !liveCheck.Checked;
+      setButtonStates();
       wakeup();
     }
 
