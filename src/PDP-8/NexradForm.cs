@@ -489,7 +489,6 @@ namespace PDP_8
         fetchTimeLabel.Text =
           DateTime.Parse(root["header"]["timestamp"].Value).ToString("dd MMM yyyy HH:mm");
         nexradRays.Compile(root);
-        ppiDisplay();
         setButtonStates();
       }
     }

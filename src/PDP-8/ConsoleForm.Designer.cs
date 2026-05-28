@@ -52,6 +52,7 @@
       hRPToolStripMenuItem = new ToolStripMenuItem();
       tektronix611ToolStripMenuItem = new ToolStripMenuItem();
       pPIToolStripMenuItem = new ToolStripMenuItem();
+      nexradToolStripMenuItem = new ToolStripMenuItem();
       optionsToolStripMenuItem = new ToolStripMenuItem();
       x10ToolStripMenuItem = new ToolStripMenuItem();
       showFrontPanelToolStripMenuItem = new ToolStripMenuItem();
@@ -105,7 +106,8 @@
       label2 = new Label();
       label1 = new Label();
       runTimer = new System.Windows.Forms.Timer(components);
-      nexradToolStripMenuItem = new ToolStripMenuItem();
+      toolStripSeparator2 = new ToolStripSeparator();
+      coreDumpToolStripMenuItem = new ToolStripMenuItem();
       menuStrip1.SuspendLayout();
       panel1.SuspendLayout();
       SuspendLayout();
@@ -219,51 +221,58 @@
       // tty1ConsoleToolStripMenuItem
       // 
       tty1ConsoleToolStripMenuItem.Name = "tty1ConsoleToolStripMenuItem";
-      tty1ConsoleToolStripMenuItem.Size = new Size(270, 34);
+      tty1ConsoleToolStripMenuItem.Size = new Size(219, 34);
       tty1ConsoleToolStripMenuItem.Text = "TTY1";
       tty1ConsoleToolStripMenuItem.Click += aSR38ConsoleToolStripMenuItem_Click;
       // 
       // tTY2ToolStripMenuItem
       // 
       tTY2ToolStripMenuItem.Name = "tTY2ToolStripMenuItem";
-      tTY2ToolStripMenuItem.Size = new Size(270, 34);
+      tTY2ToolStripMenuItem.Size = new Size(219, 34);
       tTY2ToolStripMenuItem.Text = "TTY2";
       tTY2ToolStripMenuItem.Click += tTY2ToolStripMenuItem_Click;
       // 
       // rK05ToolStripMenuItem
       // 
       rK05ToolStripMenuItem.Name = "rK05ToolStripMenuItem";
-      rK05ToolStripMenuItem.Size = new Size(270, 34);
+      rK05ToolStripMenuItem.Size = new Size(219, 34);
       rK05ToolStripMenuItem.Text = "RK05";
       rK05ToolStripMenuItem.Click += rK05ToolStripMenuItem_Click;
       // 
       // dECtapeToolStripMenuItem
       // 
       dECtapeToolStripMenuItem.Name = "dECtapeToolStripMenuItem";
-      dECtapeToolStripMenuItem.Size = new Size(270, 34);
+      dECtapeToolStripMenuItem.Size = new Size(219, 34);
       dECtapeToolStripMenuItem.Text = "DECtape";
       dECtapeToolStripMenuItem.Click += dECtapeToolStripMenuItem_Click;
       // 
       // hRPToolStripMenuItem
       // 
       hRPToolStripMenuItem.Name = "hRPToolStripMenuItem";
-      hRPToolStripMenuItem.Size = new Size(270, 34);
+      hRPToolStripMenuItem.Size = new Size(219, 34);
       hRPToolStripMenuItem.Text = "HRP";
       hRPToolStripMenuItem.Click += hRPToolStripMenuItem_Click;
       // 
       // tektronix611ToolStripMenuItem
       // 
       tektronix611ToolStripMenuItem.Name = "tektronix611ToolStripMenuItem";
-      tektronix611ToolStripMenuItem.Size = new Size(270, 34);
+      tektronix611ToolStripMenuItem.Size = new Size(219, 34);
       tektronix611ToolStripMenuItem.Text = "Tektronix 611";
       tektronix611ToolStripMenuItem.Click += tektronix611ToolStripMenuItem_Click;
       // 
       // pPIToolStripMenuItem
       // 
       pPIToolStripMenuItem.Name = "pPIToolStripMenuItem";
-      pPIToolStripMenuItem.Size = new Size(270, 34);
+      pPIToolStripMenuItem.Size = new Size(219, 34);
       pPIToolStripMenuItem.Text = "PPI";
       pPIToolStripMenuItem.Click += pPIToolStripMenuItem_Click;
+      // 
+      // nexradToolStripMenuItem
+      // 
+      nexradToolStripMenuItem.Name = "nexradToolStripMenuItem";
+      nexradToolStripMenuItem.Size = new Size(219, 34);
+      nexradToolStripMenuItem.Text = "Nexrad";
+      nexradToolStripMenuItem.Click += nexradToolStripMenuItem_Click;
       // 
       // optionsToolStripMenuItem
       // 
@@ -289,7 +298,7 @@
       // 
       // analyzeToolStripMenuItem
       // 
-      analyzeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { showListingToolStripMenuItem1, toolStripSeparator4, recordToolStripMenuItem, recordOnlyBreaksToolStripMenuItem, firstEventToolStripMenuItem, nextEventToolStripMenuItem, previousEventToolStripMenuItem, clearEventsToolStripMenuItem });
+      analyzeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { showListingToolStripMenuItem1, toolStripSeparator4, recordToolStripMenuItem, recordOnlyBreaksToolStripMenuItem, firstEventToolStripMenuItem, nextEventToolStripMenuItem, previousEventToolStripMenuItem, clearEventsToolStripMenuItem, toolStripSeparator2, coreDumpToolStripMenuItem });
       analyzeToolStripMenuItem.Name = "analyzeToolStripMenuItem";
       analyzeToolStripMenuItem.Size = new Size(89, 29);
       analyzeToolStripMenuItem.Text = "Analyze";
@@ -838,12 +847,17 @@
       runTimer.Interval = 15;
       runTimer.Tick += runTimer_Tick;
       // 
-      // nexradToolStripMenuItem
+      // toolStripSeparator2
       // 
-      nexradToolStripMenuItem.Name = "nexradToolStripMenuItem";
-      nexradToolStripMenuItem.Size = new Size(270, 34);
-      nexradToolStripMenuItem.Text = "Nexrad";
-      nexradToolStripMenuItem.Click += nexradToolStripMenuItem_Click;
+      toolStripSeparator2.Name = "toolStripSeparator2";
+      toolStripSeparator2.Size = new Size(287, 6);
+      // 
+      // coreDumpToolStripMenuItem
+      // 
+      coreDumpToolStripMenuItem.Name = "coreDumpToolStripMenuItem";
+      coreDumpToolStripMenuItem.Size = new Size(290, 34);
+      coreDumpToolStripMenuItem.Text = "Core Dump...";
+      coreDumpToolStripMenuItem.Click += coreDumpToolStripMenuItem_Click;
       // 
       // ConsoleForm
       // 
@@ -950,5 +964,7 @@
     private ToolStripMenuItem dECtapeToolStripMenuItem;
     private ToolStripMenuItem pPIToolStripMenuItem;
     private ToolStripMenuItem nexradToolStripMenuItem;
+    private ToolStripSeparator toolStripSeparator2;
+    private ToolStripMenuItem coreDumpToolStripMenuItem;
   }
 }

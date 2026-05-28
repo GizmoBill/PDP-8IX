@@ -2413,7 +2413,7 @@ public class Integrator : IODevice
     RegisterAction("integrator", integratorDone);
 
     grand.Mean = 0;
-    grand.Sigma = 8;
+    grand.Sigma = 2;
 
     Reset();
   }

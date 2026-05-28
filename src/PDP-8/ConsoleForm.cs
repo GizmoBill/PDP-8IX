@@ -967,8 +967,8 @@ namespace PDP_8
       if (args.Length >= 2 && File.Exists(args[1]))
       {
         string file = args[1];
-        documentFilename = args[1];
         restoreState(file);
+        documentFilename = args[1];
       }
       else if (File.Exists(stateFile2))
         restoreState(stateFile2);
