@@ -63,6 +63,8 @@ namespace PDP_8
       onExit += exitHandler;
 
       RegisterAction("nexrad", wakeup);
+
+      sweepSelectionCombo.SelectedIndex = 1;
     }
 
     private void findNexradPaths()
@@ -277,7 +279,12 @@ namespace PDP_8
     //
     // What this code assumes is that, after combining the two low elevation
     // sweeps, elevations are monotonically increasing. Bin size, azimuth
-    // order, and rays/sweep are not assumed. 
+    // order, and rays/sweep are not assumed.
+    //
+    // It seems that the second low-elevation sweep is significantly corrupted
+    // at certain range bands, acrosss every Nexrad site I've tried. The
+    // sweepSelect parameter chooses: 0 combine both; 1 first sweep only;
+    // 2 second sweep only.
     public class NexradRays
     {
       public bool DataAvailable
@@ -285,7 +292,7 @@ namespace PDP_8
         get { return rays != null; }
       }
 
-      public void Compile(XmlLiteNode root)
+      public void Compile(XmlLiteNode root, int sweepSelect = 1)
       {
         // Runs on threadpool thread for fetch, UI thread for load. Not thread safe.
         XmlLiteNode headerNode = root["header"];
@@ -322,10 +329,13 @@ namespace PDP_8
           int prev = trueSweeps.Count - 1;
           if (prev >= 0 && Math.Abs(trueSweeps[prev].Item1 - meanEl) < 0.1)
           {
-            double newEl = 0.5 * (meanEl + trueSweeps[prev].Item1);
-            int oldStart = trueSweeps[prev].Item2;
-            trueSweeps.RemoveAt(prev);
-            trueSweeps.Add((newEl, oldStart, stop));
+            if (sweepSelect != 1)
+            {
+              double newEl = 0.5 * (meanEl + trueSweeps[prev].Item1);
+              int oldStart = sweepSelect == 0 ? trueSweeps[prev].Item2 : start;
+              trueSweeps.RemoveAt(prev);
+              trueSweeps.Add((newEl, oldStart, stop));
+            }
           }
           else
             trueSweeps.Add((meanEl, start, stop));
@@ -488,7 +498,7 @@ namespace PDP_8
         XmlLiteNode root = XmlLiteNode.ReadFromFile(ofd.FileName)["nexrad_data"];
         fetchTimeLabel.Text =
           DateTime.Parse(root["header"]["timestamp"].Value).ToString("dd MMM yyyy HH:mm");
-        nexradRays.Compile(root);
+        nexradRays.Compile(root, sweepSelectionCombo.SelectedIndex);
         setButtonStates();
       }
     }
@@ -525,6 +535,21 @@ namespace PDP_8
       {
         e.Cancel = true;
         Hide();
+      }
+    }
+
+    private void NexradForm_Shown(object sender, EventArgs e)
+    {
+      if (exePath == null)
+      {
+        OpenFileDialog ofd = new OpenFileDialog();
+        ofd.Filter = "Nexrad executable|" + ExeName;
+        ofd.Title = "Please locate NexradParser.exe";
+        if (ofd.ShowDialog() == DialogResult.OK)
+        {
+          exePath = ofd.FileName;
+          nexradPath = Path.GetDirectoryName(Path.GetDirectoryName(exePath));
+        }
       }
     }
   }

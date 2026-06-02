@@ -40,6 +40,7 @@
       enableCheck = new CheckBox();
       showButton = new Button();
       loadButton = new Button();
+      sweepSelectionCombo = new ComboBox();
       ((System.ComponentModel.ISupportInitialize)intervalNumeric).BeginInit();
       SuspendLayout();
       // 
@@ -165,11 +166,22 @@
       loadButton.UseVisualStyleBackColor = true;
       loadButton.Click += loadButton_Click;
       // 
+      // sweepSelectionCombo
+      // 
+      sweepSelectionCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+      sweepSelectionCombo.FormattingEnabled = true;
+      sweepSelectionCombo.Items.AddRange(new object[] { "Both", "First", "Second" });
+      sweepSelectionCombo.Location = new Point(160, 251);
+      sweepSelectionCombo.Name = "sweepSelectionCombo";
+      sweepSelectionCombo.Size = new Size(124, 36);
+      sweepSelectionCombo.TabIndex = 12;
+      // 
       // NexradForm
       // 
       AutoScaleDimensions = new SizeF(144F, 144F);
       AutoScaleMode = AutoScaleMode.Dpi;
-      ClientSize = new Size(468, 239);
+      ClientSize = new Size(468, 231);
+      Controls.Add(sweepSelectionCombo);
       Controls.Add(loadButton);
       Controls.Add(showButton);
       Controls.Add(enableCheck);
@@ -189,6 +201,7 @@
       StartPosition = FormStartPosition.Manual;
       Text = "Nexrad";
       FormClosing += NexradForm_FormClosing;
+      Shown += NexradForm_Shown;
       ((System.ComponentModel.ISupportInitialize)intervalNumeric).EndInit();
       ResumeLayout(false);
       PerformLayout();
@@ -208,5 +221,6 @@
     private CheckBox enableCheck;
     private Button showButton;
     private Button loadButton;
+    private ComboBox sweepSelectionCombo;
   }
 }
