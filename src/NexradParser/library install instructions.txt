@@ -11,3 +11,4 @@ Double-click it and select "Enabled"
 Click OK and close
 Reboot your computer
 
+python -m PyInstaller NexradParser.spec

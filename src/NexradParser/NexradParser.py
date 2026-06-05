@@ -120,7 +120,7 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
         results = conn.get_avail_scans(year, month, day, radar_id)
         
         if not results:
-            logger.warning(f"No data found for {radar_id}")
+            logger.error(f"No data found for {radar_id}")
             return False
         
         # Get latest non-MDM file
@@ -131,7 +131,7 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
                 break
         
         if not latest_scan:
-            logger.warning("No valid scan files found")
+            logger.error("No valid scan files found")
             return False
         
         if verbose:
@@ -148,11 +148,21 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
         
         local_file_obj = list(download_result.iter_success())[0]
         local_filepath = local_file_obj.filepath
-        scan_time = local_file_obj.scan_time
         source_filename = os.path.basename(local_filepath)
-        
+
         if verbose:
             logger.info(f"Downloaded: {local_filepath}")
+        
+        # Get output XML file name
+        scan_time = local_file_obj.scan_time
+        timestamp_str = scan_time.strftime("%Y%m%d_%H%M%S") if scan_time else datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        output_file = output_dir / f"{radar_id}_{timestamp_str}.xml"
+
+        # If output file already exists, it's the same dataset so just keep it
+        if os.path.exists(output_file):
+            logger.info(f"{output_file} already exists")
+            print(f"[AE] {output_file}")
+            return True
         
         # Parse with PyART
         if verbose:
@@ -170,8 +180,9 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
         
         reflectivity = radar.fields['reflectivity']['data']
         
-        # Get bin resolution (gate spacing in meters)
-        range_res = radar.range['data'][1] - radar.range['data'][0]
+        # Get bin resolution (gate spacing in meters). Assumes all bins are same.
+        start_range = radar.range['data'][0]
+        range_res = radar.range['data'][1] - start_range
         
         # Build output structure as XML
         root = ET.Element("nexrad_data")
@@ -184,6 +195,7 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
         ET.SubElement(header, "latitude").text = str(float(radar.latitude["data"][0]))
         ET.SubElement(header, "longitude").text = str(float(radar.longitude["data"][0]))
         ET.SubElement(header, "altitude_m").text = str(float(radar.altitude["data"][0]))
+        ET.SubElement(header, "start_range_m").text = str(float(start_range))
         ET.SubElement(header, "bin_resolution_m").text = str(float(range_res))
         ET.SubElement(header, "number_of_gates").text = str(int(radar.ngates))
         ET.SubElement(header, "number_of_rays").text = str(int(radar.nrays))
@@ -223,11 +235,8 @@ def fetch_latest_nexrad(radar_id, output_dir="./radar_data", verbose=False):
             dbz_elem.text = dbz_str
         
         # Save to XML with pretty printing
-        timestamp_str = scan_time.strftime("%Y%m%d_%H%M%S") if scan_time else datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        output_file = output_dir / f"{radar_id}_{timestamp_str}.xml"
-        
-        # Pretty print
         xml_str = minidom.parseString(ET.tostring(root)).toprettyxml(indent="  ")
+
         # Remove extra blank lines
         xml_str = '\n'.join([line for line in xml_str.split('\n') if line.strip()])
         
@@ -289,8 +298,9 @@ def main():
     # Fetch data
     success = fetch_latest_nexrad(args.radar, args.output_dir, args.verbose)
     
+    # The actual error has already been logged
     if not success:
-        logger.error("[NG] Failed to fetch radar data")
+        logger.warning("Failed to fetch radar data")
         sys.exit(1)
     
     if args.verbose:

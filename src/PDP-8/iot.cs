@@ -2326,7 +2326,7 @@ public class Integrator : IODevice
   bool wr73Selected { get { return (icw2 & 0x400) == 0; } }
 
   // Nexrad ray, if available
-  byte[] nexradRay;
+  sbyte[] nexradRay;
   int nexradIndex;
 
   // Synthetic radar data. A 3D ellipsoid Gaussian centered at (x0, y0, z0), at
@@ -2365,7 +2365,9 @@ public class Integrator : IODevice
   {
     get
     {
-      double dbz = 0;
+      const sbyte Noise = NexradForm.NexradRays.Noise;
+
+      double dbz = Noise;
 
       if (nexradRay == null)
       {
@@ -2384,7 +2386,7 @@ public class Integrator : IODevice
 
       // Range attenuation, convert to bin units
       double signal = 0;
-      if (dbz > 0)
+      if (dbz > Noise)
       {
         signal = dbz - 20 * Math.Log10(range / 16.0);
         signal = Math.Max(signal * k2 - k1, 0);

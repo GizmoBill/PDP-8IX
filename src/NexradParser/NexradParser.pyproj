@@ -11,6 +11,9 @@
     <OutputPath>.</OutputPath>
     <Name>NexradParser</Name>
     <RootNamespace>NexradParser</RootNamespace>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <CommandLineArguments>--radar KGYX</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

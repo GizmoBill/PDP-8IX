@@ -99,13 +99,14 @@ namespace PDP_8
 
     Process process;                  // NexradParser.exe runs here
     string nexradDataFile;            // set by outputHandler from NexradParser stdout
+    bool alreadyExists;               // the latest dataset is not new
     string errorMessage;              // set by errorHandler if NexradParser reports error
     bool warning;                     // errorMessage is a warning
     Action<int> onExit;               // set to exitHandler by constructor
     SynchronizationContext uiContext; // capture UI context
-    string[] dataFiles;               // files that exist before geting new one, for keepCheck
     string captureRadarId;            // capture radarId in case it changes after starting
-    DateTime timestamp;               // time of fetch
+    bool liveFetch;                   // current fetch is from Live mode
+    string lastLiveFile;              // last live fetch file for Keep
 
     // Compiles XML, holds the result, and finds rays from (az, el).
     public NexradRays nexradRays = new NexradRays();
@@ -115,7 +116,7 @@ namespace PDP_8
       get { return radarCombo.Text.Substring(radarCombo.Text.Length - 4); }
     }
 
-    private void fetch()
+    private void fetch(bool live)
     {
       if (exePath == null)
       {
@@ -130,10 +131,11 @@ namespace PDP_8
 
       // Initialize so we can see what happened
       nexradDataFile = null;
+      alreadyExists = false;
       errorMessage = null;
       warning = false;
-      dataFiles = Directory.GetFiles(Path.Combine(nexradPath, "radar_data"));
       captureRadarId = radarID;
+      liveFetch = live;
       fetchTimeLabel.Text = "Fetching " + captureRadarId;
 
       // Start NexradParser.exe
@@ -170,9 +172,11 @@ namespace PDP_8
       // Process results on threadpool thread
       if (code == 0 && nexradDataFile != null && File.Exists(nexradDataFile))
       {
-        XmlLiteNode root = XmlLiteNode.ReadFromFile(nexradDataFile)["nexrad_data"];
-        timestamp = DateTime.Parse(root["header"]["timestamp"].Value);
-        nexradRays.Compile(root);
+        if (!alreadyExists || captureRadarId != nexradRays.RadarId)
+        {
+          XmlLiteNode root = XmlLiteNode.ReadFromFile(nexradDataFile)["nexrad_data"];
+          nexradRays.Compile(root);
+        }
       }
       else
       {
@@ -191,7 +195,9 @@ namespace PDP_8
       string s = outLine.Data;
       if (!string.IsNullOrEmpty(s))
       {
-        if (s.StartsWith("[OK]"))
+        if (s.StartsWith("[AE]"))
+          alreadyExists = true;
+        if (s.StartsWith("[OK]") || alreadyExists)
           nexradDataFile = Path.Combine(nexradPath, s.Substring(5));
       }
     }
@@ -228,18 +234,20 @@ namespace PDP_8
       // UI thread
       if (exitCode == 0)
       {
-        fetchTimeLabel.Text = timestamp.ToString("dd MMM yyyy HH:mm");
+        string msg = nexradRays.DatasetId;
+        if (alreadyExists)
+          msg += " (old)";
+        fetchTimeLabel.Text = msg;
 
-        if (!keepCheck.Checked)
-        {
-          string currentFile = Path.GetFileName(nexradDataFile);
-          foreach (string path in dataFiles)
-          {
-            string file = Path.GetFileName(path);
-            if (file != currentFile && file.StartsWith(captureRadarId))
-              File.Delete(path);
-          }
-        }
+        if (!keepCheck.Checked && !alreadyExists &&
+            lastLiveFile != null && File.Exists(lastLiveFile) &&
+            Path.GetFileName(lastLiveFile).StartsWith(captureRadarId))
+          File.Delete(lastLiveFile);
+
+        if (liveFetch && !alreadyExists)
+          lastLiveFile = nexradDataFile;
+        else
+          lastLiveFile = null;
       }
       else if (errorMessage != null)
         fetchTimeLabel.Text = errorMessage;
@@ -287,9 +295,20 @@ namespace PDP_8
     // 2 second sweep only.
     public class NexradRays
     {
+      public const sbyte Noise = -128;
+
       public bool DataAvailable
       {
         get { return rays != null; }
+      }
+
+      public string RadarId { get; private set; }
+
+      public DateTime Timestamp { get; private set; }
+
+      public string DatasetId
+      {
+        get { return string.Format("{0} {1:dd MMM yyyy HH:mm}", RadarId, Timestamp); }
       }
 
       public void Compile(XmlLiteNode root, int sweepSelect = 1)
@@ -299,14 +318,20 @@ namespace PDP_8
         XmlLiteNode sweepsNode = root["sweeps"];
         XmlLiteNode raysNode = root["rays"];
 
+        RadarId = headerNode["radar_id"].Value;
+        Timestamp = DateTime.Parse(headerNode["timestamp"].Value);
+
         const double kmPerNmi = 1.852;
         double kmPerBin = double.Parse(headerNode["bin_resolution_m"].Value) / 1000;
+        XmlLiteNode startRangeNode = headerNode["start_range_m"];
+        double startRange = startRangeNode != null ? double.Parse(startRangeNode.Value) / 1000 : 0.0;
         double nmiPerBin = kmPerBin / kmPerNmi;
+        double startBin = startRange / kmPerBin;
         int srcBinsPerRay = int.Parse(headerNode["number_of_gates"].Value);
-        int dstBinsPerRay = (int)(srcBinsPerRay * nmiPerBin * 2); // dst bins are 0.5 nmi
+        int dstBinsPerRay = (int)((srcBinsPerRay + startBin) * nmiPerBin * 2); // dst bins are 0.5 nmi
         int numRays = int.Parse(headerNode["number_of_rays"].Value);
 
-        double[] rawBins = new double[srcBinsPerRay];
+        sbyte[] rawBins = new sbyte[srcBinsPerRay];
 
         // Create local elevations, azimuths, and rays so that the integrator on
         // the UI thread can continue to have access to the current ones while
@@ -342,9 +367,9 @@ namespace PDP_8
         }
 
         // Create rays
-        byte[][] rays = new byte[numRays][];
+        sbyte[][] rays = new sbyte[numRays][];
         for (int i = 0; i < numRays; ++i)
-          rays[i] = new byte[dstBinsPerRay];
+          rays[i] = new sbyte[dstBinsPerRay];
 
         // Make azimuths and rays
         List<(double, int)> elevations = new List<(double, int)>();
@@ -371,24 +396,26 @@ namespace PDP_8
               {
                 int runLen = int.Parse(b.Substring(1));
                 while (--runLen >= 0)
-                  rawBins[j++] = 0;
+                  rawBins[j++] = Noise;
               }
               else
-                rawBins[j++] = Math.Max(double.Parse(b), 0);
+                rawBins[j++] = (sbyte)Math.Round(Math.Min(Math.Max(double.Parse(b), Noise), 127));
 
             // Write destination ray
             for (int b = 0; b < dstBinsPerRay; ++b)
             {
-              int p = (int)Math.Round(0.5 * (b - 0.5) / nmiPerBin);
-              int q = (int)Math.Round(0.5 * (b + 0.5) / nmiPerBin) + 1;
-              p = Math.Max(p, 0);
-              q = Math.Min(q, srcBinsPerRay);
-              double z = 0;
-              for (int k = p; k < q; ++k)
-                z += rawBins[k];
-              z /= q - p;
+              // b is dst bin index, in half-nautical miles. nmiPerBin is nmi
+              // per src bin. 0.5 * nmi/0.5 / nmi/dstBin = dst bin index
+              int p = (int)Math.Round(0.5 * (b - 0.5) / nmiPerBin - startBin);
+              int q = (int)Math.Round(0.5 * (b + 0.5) / nmiPerBin - startBin) + 1;
+              p = Math.Min(Math.Max(p, 0), srcBinsPerRay - 1);
+              q = Math.Min(Math.Max(q, 0), srcBinsPerRay);
 
-              rays[r][b] = (byte)Math.Round(z);
+              sbyte z = Noise;
+              for (int k = p; k < q; ++k)
+                z = Math.Max(z, rawBins[k]);
+
+              rays[r][b] = z;
             }
           }
 
@@ -405,13 +432,13 @@ namespace PDP_8
         mutex.ReleaseMutex();
       }
 
-      public byte[] GetRay(double az, double el)
+      public sbyte[] GetRay(double az, double el)
       {
         // Runs on UI thread
         mutex.WaitOne();
         int azIndex = find(el, elevations);
         int rayIndex = find(az, azimuths[azIndex]);
-        byte[] ray = rays[rayIndex];
+        sbyte[] ray = rays[rayIndex];
         mutex.ReleaseMutex();
 
         return ray;
@@ -433,7 +460,7 @@ namespace PDP_8
 
       private List<(double, int)> elevations;
       private List<(double, int)>[] azimuths;
-      private byte[][] rays;
+      private sbyte[][] rays;
     }
 
     // ********************
@@ -445,7 +472,7 @@ namespace PDP_8
     private void ppiDisplay()
     {
       const double kmPerNmi = 1.852;
-      int binSize = 2;    // 1, 2, or 4
+      int binSize = 4;    // 1, 2, or 4
       double nmiPerBin = binSize / 2;
       int skipBins = (int)Math.Round(250.0 / kmPerNmi / nmiPerBin) - 100;
       skipBins = Math.Max(skipBins, 0);
@@ -454,15 +481,22 @@ namespace PDP_8
       for (int az = 0; az < 360; ++az)
       {
         int azimuth = az * 4096 / 360;
-        byte[] ray = nexradRays.GetRay(az, 0.5);
+        sbyte[] ray = nexradRays.GetRay(az, 0.5);
 
         ppi.Ray(0xAAA);   // sync
-        ppi.Ray(0);       // command
+        ppi.Ray(1);       // command
         ppi.Ray(azimuth);
         ppi.Ray(0);       // unknown
         ppi.Ray(icw1);
         for (int i = 0; i < 100; ++i)
-          ppi.Ray(ray[(i + skipBins) * binSize]);
+        {
+          sbyte z = ray[(i + skipBins) * binSize];
+          if (z == NexradRays.Noise)
+            z = 0;
+          else
+            z += 40;
+          ppi.Ray(z);
+        }
       }
     }
 
@@ -474,7 +508,7 @@ namespace PDP_8
 
     private void fetchButton_Click(object sender, EventArgs e)
     {
-      fetch();
+      fetch(false);
     }
 
     private void showButton_Click(object sender, EventArgs e)
@@ -496,9 +530,8 @@ namespace PDP_8
       {
         fetchButton.Enabled = false;
         XmlLiteNode root = XmlLiteNode.ReadFromFile(ofd.FileName)["nexrad_data"];
-        fetchTimeLabel.Text =
-          DateTime.Parse(root["header"]["timestamp"].Value).ToString("dd MMM yyyy HH:mm");
         nexradRays.Compile(root, sweepSelectionCombo.SelectedIndex);
+        fetchTimeLabel.Text = nexradRays.DatasetId;
         setButtonStates();
       }
     }
@@ -525,7 +558,7 @@ namespace PDP_8
       if (liveCheck.Checked)
       {
         CallMeReal("nexrad", (double)intervalNumeric.Value * 60.0e6);
-        fetch();
+        fetch(true);
       }
     }
 

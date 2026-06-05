@@ -27,6 +27,7 @@ namespace PDP_8
     const int ImageRadius = MaxRange + 20;
     const int ImageDimension = 2 * ImageRadius + 1;
     const double kmPerNmi = 1.852;
+    const byte RangeRingColor = 128;
 
     // Form background image
     Bitmap bmp;
@@ -208,30 +209,44 @@ namespace PDP_8
     {
       Color[] colors = new Color[]
       {
-        Color.Black,
-        Color.Violet,
-        Color.Cyan,
-        Color.Green,
-        Color.Yellow,
-        Color.Orange,
-        Color.Red
+        Color.Black,    //-40 - -31
+        Color.Black,    //-30 - -21
+        Color.Black,    //-20 - -11
+        Color.Brown,    //-10 -  -1
+        Color.Violet,   //  0 -   9
+        Color.DarkCyan, // 10 -  19
+        Color.Cyan,     // 20 -  29
+        Color.Green,    // 30 -  39
+        Color.Yellow,   // 40 -  49
+        Color.Orange,   // 50 -  59
+        Color.Red       // 60 -  87
+      };
+
+      Color[] grays = new Color[]
+      {
+        Color.FromArgb(  0,   0,   0),
+        Color.FromArgb(  0,   0,   0),
+        Color.FromArgb(  0,   0,   0),
+        Color.FromArgb( 32,  32,  32),
+        Color.FromArgb( 64,  64,  64),
+        Color.FromArgb( 96,  96,  96),
+        Color.FromArgb(128, 128, 128),
+        Color.FromArgb(160, 160, 160),
+        Color.FromArgb(192, 192, 192),
+        Color.FromArgb(224, 224, 224),
+        Color.FromArgb(255, 255, 255),
       };
 
       ColorPalette pal = bmp.Palette;
-      if (colorMode)
-      {
-        for (int i = 0; i < 128; ++i)
-          pal.Entries[i] = colors[Math.Min(i / 10, colors.Length - 1)];
-        for (int z = 1; z < 255; z += 2)
-          pal.Entries[z / 2 + 128] = Color.FromArgb(z, z, z);
-      }
-      else
-        for (int i = 0; i < 255; i++)
-        {
-          int z = Math.Min((int)Math.Round(i / 63.0 * 255.0), 255);
-          pal.Entries[i] = Color.FromArgb(z, z, z);
-        }
+      Color[] colorTable = colorMode ? colors : grays;
 
+      for (int i = 0; i < 128; ++i)
+        pal.Entries[i] = colorTable[Math.Min(i / 10, colorTable.Length - 1)];
+
+      for (int i = 128; i <= 253; ++i)
+        pal.Entries[i] = Color.Pink;
+
+      pal.Entries[RangeRingColor] = Color.White;
       pal.Entries[255] = Color.Beige;
 
       bmp.Palette = pal;
@@ -242,6 +257,9 @@ namespace PDP_8
     // *  Process Ray from PDP-8  *
     // *                          *
     // ****************************
+
+    bool hdrMode = false;   // high dynamic range mode for RADAR v4.2
+    const int zeroDbz = 40; // in HDR mode, 0 dbZ value
 
     public void Ray(int w)
     {
@@ -259,6 +277,7 @@ namespace PDP_8
           break;
 
         case RayPhase.Command:    // don't know what this does. value is 4000 for PPI
+          hdrMode = w == 1;       // RADAR v4.2 HDR mode
           rayPhase = RayPhase.Azimuth;
           break;
 
@@ -292,21 +311,19 @@ namespace PDP_8
           break;
 
         case RayPhase.Bin:
+          if (!hdrMode && w > 0)
+            w += zeroDbz;
+
           for (int r = 0; r < binRes; ++r)
           {
             int count = binMap[azimuth][mapIndex++];
             if (count >= 0)
-            {
-              if (w >= 0x800)     // dbZ can be negative in close
-                w = 0;
-
               for (int i = 0; i < count; ++i)
               {
                 int index = binMap[azimuth][mapIndex++];
                 dbzMap[index] = (byte)w; 
                 lifeTime[index] = maxLife;
               }
-            }
             else
             {
               binCounter = 99;
@@ -316,10 +333,9 @@ namespace PDP_8
 
           if (++binCounter == 100)
           {
-            byte z = (byte)(colorMode ? 254 : 64);
             foreach (int index in rangeRings[azimuth])
             {
-              dbzMap[index] = z;
+              dbzMap[index] = RangeRingColor;
               lifeTime[index] = maxLife;
             }
 
